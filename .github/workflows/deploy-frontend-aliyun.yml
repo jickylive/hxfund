@@ -1,0 +1,130 @@
+# 前端部署 - 阿里云虚拟主机 FTP
+# 构建并上传前端静态文件到阿里云虚拟主机的 FTP 服务器
+
+name: Frontend Deploy - Aliyun FTP
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'public/**'
+      - 'index.html'
+      - 'style.css'
+      - 'script.js'
+      - 'package.json'
+      - 'scripts/**'
+      - '!scripts/build.js'  # 排除构建脚本本身的变更触发
+  workflow_dispatch:  # 允许手动触发
+    inputs:
+      target_environment:
+        description: 'Target Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy Frontend
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      deployments: write
+
+    environment:
+      name: ${{ inputs.target_environment || 'production' }}
+      url: ${{ vars.FRONTEND_URL || 'https://www.hxfund.cn' }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔨 Build production assets
+        run: |
+          # 创建 dist 目录
+          mkdir -p dist
+
+          # 复制基本文件
+          cp index.html style.css script.js README.md dist/
+
+          # 复制 public 目录内容到 dist
+          cp -r public/* dist/
+
+          # 替换 API 配置（如果需要）
+          if [ -n "${{ secrets.API_BASE_URL }}" ]; then
+            sed -i "s|https://api.hxfund.cn|${{ secrets.API_BASE_URL }}|g" dist/index.html
+          fi
+
+          # 显示构建结果
+          ls -la dist/
+        env:
+          NODE_ENV: production
+
+      - name: 🧪 Verify build
+        run: |
+          if [ ! -f "dist/index.html" ]; then
+            echo "❌ Build failed: index.html not found in dist/"
+            exit 1
+          fi
+          echo "✅ Build verification passed"
+
+      - name: 📤 Deploy to Aliyun FTP (Main Site)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          local-dir: dist/
+          server-dir: /htdocs/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/tests/**
+            **/scripts/**
+            **.md
+            **.env
+          dangerous-clean-slate: false  # 不清除服务器上的现有文件
+
+      - name: 📤 Deploy to Aliyun FTP (Blog Subdirectory)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          local-dir: dist/
+          server-dir: /htdocs/blog/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/tests/**
+            **/scripts/**
+            **.md
+            **.env
+          dangerous-clean-slate: false  # 不清除服务器上的现有文件
+
+      - name: 🚀 Deployment Notification
+        run: |
+          echo "✅ Frontend deployment completed!"
+          echo "🌐 Main site: https://${{ secrets.FRONTEND_DOMAIN || 'www.hxfund.cn' }}"
+          echo "📰 Blog site: https://${{ secrets.FRONTEND_DOMAIN || 'www.hxfund.cn' }}/blog/"
+          echo "🔄 Deployed branch: $GITHUB_REF_NAME"
+          echo "🆔 Commit: $GITHUB_SHA"

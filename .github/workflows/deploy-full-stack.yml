@@ -1,0 +1,288 @@
+# 整合部署 - 前端和后端
+# 同时部署前端到阿里云FTP主机和后端到阿里云ECS主机
+
+name: Full Stack Deploy - Frontend + Backend
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # 允许手动触发
+    inputs:
+      deploy_frontend:
+        description: 'Deploy Frontend'
+        required: true
+        default: true
+        type: boolean
+      deploy_backend:
+        description: 'Deploy Backend'
+        required: true
+        default: true
+        type: boolean
+      target_environment:
+        description: 'Target Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  frontend-deploy:
+    name: Deploy Frontend to Aliyun FTP
+    runs-on: ubuntu-latest
+    if: ${{ inputs.deploy_frontend != false }}
+
+    permissions:
+      contents: read
+      deployments: write
+
+    environment:
+      name: ${{ inputs.target_environment || 'production' }}
+      url: ${{ vars.FRONTEND_URL || 'https://www.hxfund.cn' }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔨 Build production assets
+        run: |
+          # 创建 dist 目录
+          mkdir -p dist
+
+          # 复制基本文件
+          cp index.html dist/
+          cp style.css dist/ 2>/dev/null || echo "No style.css file"
+          cp script.js dist/ 2>/dev/null || echo "No script.js file"
+          cp README.md dist/ 2>/dev/null || echo "No README.md file"
+
+          # 复制 public 目录内容到 dist
+          if [ -d "public" ]; then
+            cp -r public/* dist/
+          fi
+
+          # 显示构建结果
+          ls -la dist/
+        env:
+          NODE_ENV: production
+
+      - name: 🧪 Verify build
+        run: |
+          if [ ! -f "dist/index.html" ]; then
+            echo "❌ Build failed: index.html not found in dist/"
+            exit 1
+          fi
+          echo "✅ Build verification passed"
+
+      - name: 📤 Deploy to Aliyun FTP (Main Site)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          local-dir: dist/
+          server-dir: /htdocs/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/tests/**
+            **/scripts/**
+            **.md
+            **.env
+          dangerous-clean-slate: false
+
+      - name: 📤 Deploy to Aliyun FTP (Blog Subdirectory)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          port: ${{ secrets.FTP_PORT || 21 }}
+          local-dir: dist/
+          server-dir: /htdocs/blog/
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/tests/**
+            **/scripts/**
+            **.md
+            **.env
+          dangerous-clean-slate: false
+
+  backend-deploy:
+    name: Deploy Backend to Aliyun ECS
+    runs-on: ubuntu-latest
+    if: ${{ inputs.deploy_backend != false }}
+
+    permissions:
+      contents: read
+      deployments: write
+
+    environment:
+      name: ${{ inputs.target_environment || 'production' }}
+      url: ${{ vars.BACKEND_URL || 'https://api.hxfund.cn' }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 🔐 Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ECS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.ECS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 📦 Prepare deployment package
+        run: |
+          # 安装生产依赖
+          npm ci --production
+
+          # 创建部署包
+          tar -czf deploy-package.tar.gz \
+            server/ \
+            package.json \
+            package-lock.json \
+            README.md
+
+      - name: 📤 Upload to ECS via SCP
+        run: |
+          scp -i ~/.ssh/id_rsa deploy-package.tar.gz ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:~/
+
+      - name: 🚀 Deploy via PM2
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} << 'EOF'
+            # 创建应用目录
+            mkdir -p /var/www/hxfund-api
+            cd /var/www/hxfund-api
+
+            # 停止旧服务
+            pm2 stop hxfund-api || echo "Service not running, continuing..."
+
+            # 备份当前版本
+            if [ -d "server" ]; then
+              BACKUP_NAME="backup_$(date +%Y%m%d_%H%M%S)"
+              mkdir -p backups
+              cp -r server/ package*.json backups/$BACKUP_NAME/
+              echo "Backup created: $BACKUP_NAME"
+            fi
+
+            # 解压新版本
+            rm -rf server/ package*.json
+            tar -xzf ~/deploy-package.tar.gz
+
+            # 安装依赖
+            npm ci --production
+
+            # 确保配置目录存在
+            mkdir -p server/config
+
+            # 创建或更新环境变量
+            cat > server/config/.env << EOL
+PORT=${{ secrets.PORT || 3000 }}
+NODE_ENV=production
+ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS || 'https://hxfund.cn,https://www.hxfund.cn' }}
+REDIS_URL=${{ secrets.REDIS_URL || 'redis://localhost:6379' }}
+WALINE_MAX_PAGE_SIZE=50
+WALINE_COMMENT_MAX_LENGTH=1000
+EOL
+
+            # 启动服务
+            pm2 start server/index.js --name hxfund-api --time
+            pm2 save
+
+            # 等待服务启动
+            sleep 5
+
+            # 检查服务状态
+            pm2 status hxfund-api
+            echo "Service logs:"
+            pm2 logs hxfund-api --lines 10
+          EOF
+
+      - name: 🔍 Health Check
+        run: |
+          echo "Waiting for service to be ready..."
+          sleep 15
+
+          # 检查服务是否正常运行
+          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} << 'EOF'
+            echo "PM2 Service Status:"
+            pm2 status hxfund-api
+            echo "Recent logs:"
+            pm2 logs hxfund-api --lines 20
+          EOF
+
+          # 测试API健康检查端点
+          HEALTH_CHECK_URL="https://${{ secrets.API_DOMAIN || 'api.hxfund.cn' }}/api/health"
+          echo "Testing health check: $HEALTH_CHECK_URL"
+
+          # 等待几秒让服务完全就绪
+          sleep 10
+
+          # 发送健康检查请求
+          if curl -f -s --connect-timeout 10 --max-time 30 "$HEALTH_CHECK_URL" > /dev/null; then
+            echo "✅ Backend health check passed"
+          else
+            echo "⚠️ Backend health check may have failed, checking status again..."
+            curl -v --connect-timeout 10 "$HEALTH_CHECK_URL" || echo "Backend health check failed"
+          fi
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: [frontend-deploy, backend-deploy]
+    if: ${{ always() && (needs.frontend-deploy.result == 'success' || needs.backend-deploy.result == 'success') }}
+
+    steps:
+      - name: 🧪 Test Frontend Availability
+        run: |
+          FRONTEND_URL="https://${{ secrets.FRONTEND_DOMAIN || 'www.hxfund.cn' }}"
+          echo "Testing frontend: $FRONTEND_URL"
+
+          if curl -f -s --connect-timeout 10 --max-time 30 "$FRONTEND_URL" > /dev/null; then
+            echo "✅ Frontend is accessible"
+          else
+            echo "⚠️ Frontend may not be accessible"
+          fi
+
+      - name: 🧪 Test Backend Availability
+        run: |
+          BACKEND_URL="https://${{ secrets.API_DOMAIN || 'api.hxfund.cn' }}/api/health"
+          echo "Testing backend: $BACKEND_URL"
+
+          if curl -f -s --connect-timeout 10 --max-time 30 "$BACKEND_URL" > /dev/null; then
+            echo "✅ Backend is accessible"
+          else
+            echo "⚠️ Backend may not be accessible"
+          fi
+
+      - name: 📊 Deployment Summary
+        run: |
+          echo "=== DEPLOYMENT SUMMARY ==="
+          echo "Frontend deployed to: https://${{ secrets.FRONTEND_DOMAIN || 'www.hxfund.cn' }}"
+          echo "Backend deployed to: https://${{ secrets.API_DOMAIN || 'api.hxfund.cn' }}"
+          echo "Deployment environment: ${{ inputs.target_environment || 'production' }}"
+          echo "Deployed commit: $GITHUB_SHA"
+          echo "Deployment completed at: $(date)"

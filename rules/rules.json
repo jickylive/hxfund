@@ -1,0 +1,104 @@
+{
+  "rules": [
+    {
+      "id": "auto-deploy-main",
+      "name": "主分支自动部署",
+      "description": "当main分支有代码提交时自动部署到生产环境",
+      "conditions": [
+        {
+          "type": "git-commit",
+          "branch": "main",
+          "filePattern": "**/*"
+        }
+      ],
+      "actions": [
+        {
+          "type": "trigger-workflow",
+          "workflow": "deploy-integration.yml",
+          "inputs": {
+            "deploy_target": "all"
+          }
+        }
+      ],
+      "enabled": true,
+      "priority": 100
+    },
+    {
+      "id": "security-scan-pr",
+      "name": "PR安全扫描",
+      "description": "每当创建新的PR时自动运行安全扫描",
+      "conditions": [
+        {
+          "type": "pull-request",
+          "action": "opened"
+        }
+      ],
+      "actions": [
+        {
+          "type": "run-security-scan"
+        }
+      ],
+      "enabled": true,
+      "priority": 50
+    },
+    {
+      "id": "daily-content-update",
+      "name": "每日内容更新",
+      "description": "每天早上8点自动生成AI内容",
+      "conditions": [
+        {
+          "type": "schedule",
+          "cron": "0 0 * * *"
+        }
+      ],
+      "actions": [
+        {
+          "type": "run-script",
+          "script": "daily-news.js"
+        }
+      ],
+      "enabled": true,
+      "priority": 30
+    },
+    {
+      "id": "backend-health-monitor",
+      "name": "后端健康监控",
+      "description": "监控后端API健康状态，异常时发送通知",
+      "conditions": [
+        {
+          "type": "schedule",
+          "cron": "*/15 * * * *"
+        }
+      ],
+      "actions": [
+        {
+          "type": "health-check",
+          "endpoint": "https://api.hxfund.cn/api/health"
+        }
+      ],
+      "enabled": true,
+      "priority": 20
+    },
+    {
+      "id": "blog-post-approval",
+      "name": "博客文章审批",
+      "description": "新博客文章提交时需要审批才能发布",
+      "conditions": [
+        {
+          "type": "file-change",
+          "path": "source/_posts/",
+          "operation": "create"
+        }
+      ],
+      "actions": [
+        {
+          "type": "create-review-task",
+          "assignees": ["admin"],
+          "labels": ["review-required"]
+        }
+      ],
+      "enabled": true,
+      "priority": 70
+    }
+  ]
+}

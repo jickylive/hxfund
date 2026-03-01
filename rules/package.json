@@ -1,0 +1,29 @@
+{
+  "name": "hxfund-rule-engine",
+  "version": "1.0.0",
+  "description": "规则自动化引擎，用于自动化执行业务规则",
+  "main": "engine.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/rules.test.js",
+    "rules:list": "node cli.js list",
+    "rules:test": "node cli.js test"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "minimatch": "^9.0.3",
+    "node-cron": "^3.0.2",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "rules",
+    "automation",
+    "workflow",
+    "hxfund"
+  ],
+  "author": "hxfund team",
+  "license": "MIT"
+}

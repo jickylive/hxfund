@@ -1,0 +1,37 @@
+{
+  "rulesConfig": {
+    "enableLogging": true,
+    "logLevel": "info",
+    "maxConcurrentActions": 5,
+    "timeout": 30000,
+    "retryAttempts": 3,
+    "retryDelay": 1000
+  },
+  "triggers": {
+    "gitEvents": {
+      "enable": true,
+      "branches": ["main", "develop"],
+      "filePatterns": ["**/*"]
+    },
+    "scheduleEvents": {
+      "enable": true
+    },
+    "apiEvents": {
+      "enable": true,
+      "endpoint": "/api/events"
+    }
+  },
+  "actions": {
+    "workflowTriggers": {
+      "maxRetries": 3
+    },
+    "scriptExecutors": {
+      "allowedPaths": ["./scripts/", "../anime-blog/scripts/"],
+      "timeout": 60000
+    },
+    "healthChecks": {
+      "timeout": 10000,
+      "retries": 2
+    }
+  }
+}
