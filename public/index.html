@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="黄氏家族寻根平台 - 数字化传承黄氏文化，帮助全球宗亲查询族谱、字辈与寻根问祖。">
+    <meta name="keywords" content="黄氏家族，寻根，族谱，字辈，黄姓，宗亲会，家族文化">
+    <meta name="author" content="黄氏家族寻根平台">
+    <title>黄氏家族寻根平台 | hxfund.cn</title>
+
+    <!-- ============================================
+         SEO & PWA 配置
+    ============================================= -->
+    <link rel="canonical" href="https://hxfund.cn/">
+    <link rel="manifest" href="/pwa/manifest.json">
+    <meta name="theme-color" content="#8B4513">
+
+    <!-- Apple 设备配置 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="黄氏寻根">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+
+    <!-- ============================================
+         API 配置（部署时修改为实际地址）
+    ============================================= -->
+    <script>
+        // 生产环境：https://api.hxfund.cn
+        // 开发环境：http://localhost:3000
+        window.API_CONFIG = {
+            baseURL: window.location.hostname === 'localhost' 
+                ? 'http://localhost:3000' 
+                : 'https://api.hxfund.cn',
+            timeout: 30000
+        };
+    </script>
+
+    <!-- 预连接关键资源 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- 字体加载 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- 关键 CSS 内联（首屏样式） -->
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}html{scroll-behavior:smooth}body{font-family:'Noto Serif SC','STKaiti','KaiTi',serif;background:#f5f3e8;color:#2c1a0e;overflow-x:hidden;line-height:1.7}body{background-image:radial-gradient(circle at 20% 20%,rgba(200,147,58,0.04) 0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(139,69,19,0.04) 0%,transparent 50%)}.page-loader{position:fixed;inset:0;background:#2d1a0e;z-index:9999;display:flex;align-items:center;justify-content:center;transition:opacity .6s,visibility .6s}.page-loader.hidden{opacity:0;visibility:hidden}.loader-inner{text-align:center}.loader-char{font-size:5rem;color:#C8933A;animation:pulse 1.5s ease-in-out infinite}.loader-text{color:#fff8f0;margin-top:1rem;font-size:1rem;letter-spacing:4px;opacity:.7}@keyframes pulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.1);opacity:1}}.header{position:sticky;top:0;z-index:1000;background:#2d1a0e;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.2);height:64px;border-bottom:1px solid rgba(200,147,58,.2)}.header.scrolled{box-shadow:0 4px 24px rgba(0,0,0,.4);background-color:rgba(45,26,14,.97)}.header-content{display:flex;align-items:center;justify-content:space-between;height:64px;max-width:1200px;margin:0 auto;padding:0 24px;position:relative;z-index:1}.logo{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0}.logo-icon{width:40px;height:40px;background:linear-gradient(135deg,#C8933A,#8B4513);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:900;color:#fff;box-shadow:0 2px 8px rgba(200,147,58,.4)}.logo-text{font-size:1.1rem;font-weight:700;letter-spacing:2px;color:#fff}.nav{display:flex;gap:4px;align-items:center}.nav-link{color:rgba(255,248,240,.75);text-decoration:none;padding:6px 14px;border-radius:6px;font-size:.9rem;letter-spacing:1px;transition:all .3s;position:relative}.nav-link:hover,.nav-link.active{color:#E8BF7A}.hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:4px;border:none;background:none}.hamburger span{width:24px;height:2px;background:#fff;border-radius:2px;transition:all .3s;display:block}.hero-section{margin-top:64px;min-height:calc(100vh - 64px);display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden;background:linear-gradient(160deg,#2d1a0e 0%,#3d2413 30%,#4a2c18 60%,#2d1a0e 100%)}.hero-content{position:relative;z-index:2;padding:60px 20px}.container{max-width:1200px;margin:0 auto;padding:0 24px;position:relative;z-index:1}@media(max-width:768px){.nav{display:none}.hamburger{display:flex}}@media(max-width:480px){.logo-text{display:none}.hero-title{font-size:2rem!important}}
+    </style>
+
+    <!-- 非关键 CSS 异步加载 -->
+    <link rel="preload" href="/css/style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/style.css"></noscript>
+</head>
+
+<body>
+    <!-- ============================================
+         页面加载动画
+    ============================================= -->
+    <div id="pageLoader" class="page-loader">
+        <div class="loader-inner">
+            <div class="loader-char">黄</div>
+            <div class="loader-text">黄氏寻根平台 · 载入中...</div>
+        </div>
+    </div>
+
+    <!-- ============================================
+         导航栏
+    ============================================= -->
+    <header class="header" id="mainHeader">
+        <div class="container header-content">
+            <div class="logo">
+                <span class="logo-icon">黄</span>
+                <span class="logo-text">黄氏宗亲 · 寻根</span>
+            </div>
+            <nav class="nav" id="mainNav">
+                <a href="#home" class="nav-link active" id="nav-home">首页</a>
+                <a href="#tree" class="nav-link" id="nav-tree">族谱</a>
+                <a href="#calculator" class="nav-link" id="nav-calculator">字辈</a>
+                <a href="#qwen" class="nav-link" id="nav-qwen">Qwen AI</a>
+                <a href="#ppt" class="nav-link" id="nav-ppt">介绍</a>
+                <a href="#blockchain" class="nav-link" id="nav-blockchain">存证</a>
+                <a href="#guestbook" class="nav-link" id="nav-guestbook">留言</a>
+            </nav>
+            <button class="hamburger" id="hamburgerBtn" aria-label="菜单">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ============================================
+         主内容区
+    ============================================= -->
+    <main>
+        <!-- 模块一：首页 Hero -->
+        <section id="home" class="hero-section">
+            <div class="hero-bg-pattern"></div>
+            <div class="container hero-content">
+                <div class="hero-badge">hxfund.cn · 黄氏寻根</div>
+                <h1 class="hero-title">
+                    <span class="title-char">江</span><span class="title-char">夏</span>
+                    <span class="title-char delay1">源</span><span class="title-char delay2">流</span><br>
+                    <span class="title-char delay3">源</span><span class="title-char delay4">远</span>
+                    <span class="title-char delay5">流</span><span class="title-char delay6">长</span>
+                </h1>
+                <p class="hero-subtitle">数字化传承黄氏家族文化 · 连接全球宗亲 · 守护千年血脉</p>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <div class="stat-num" data-count="28">0</div>
+                        <div class="stat-label">个省份</div>
+                    </div>
+                    <div class="stat-divider">|</div>
+                    <div class="stat-item">
+                        <div class="stat-num" data-count="3200">0</div>
+                        <div class="stat-label">万 + 宗亲</div>
+                    </div>
+                    <div class="stat-divider">|</div>
+                    <div class="stat-item">
+                        <div class="stat-num" data-count="4600">0</div>
+                        <div class="stat-label">年历史</div>
+                    </div>
+                </div>
+                <a href="#tree" class="hero-btn">探索家族世系 ↓</a>
+            </div>
+            <div class="scroll-indicator">
+                <div class="scroll-arrow"></div>
+            </div>
+        </section>
+
+        <!-- 模块二：3D 动态族谱树 -->
+        <section id="tree" class="section">
+            <div class="container">
+                <div class="section-header">
+                    <div class="section-badge">GENEALOGY TREE</div>
+                    <h2 class="section-title">家族世系树</h2>
+                    <p class="section-desc">递归展示黄氏传承脉络，点击族人卡片查看详细档案</p>
+                </div>
+                <div class="tree-controls">
+                    <button class="tree-btn" id="expandAll">展开全部</button>
+                    <button class="tree-btn" id="collapseAll">收折全部</button>
+                    <span class="tree-hint">← 横向滚动查看更多 →</span>
+                </div>
+                <div class="tree-container">
+                    <div class="tree-wrapper" id="treeRoot">
+                        <!-- 树节点将通过 JS 渲染 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 模块三：智能字辈计算器 -->
+        <section id="calculator" class="section bg-alt">
+            <div class="container">
+                <div class="section-header">
+                    <div class="section-badge">GENERATION CALCULATOR</div>
+                    <h2 class="section-title">字辈推算</h2>
+                    <p class="section-desc">输入您所在的世系代数，智能匹配对应字辈汉字</p>
+                </div>
+                <div class="calc-card card">
+                    <div class="calc-form">
+                        <div class="form-group">
+                            <label for="branchSelect">选择分支</label>
+                            <select id="branchSelect">
+                                <option value="jiangxia">江夏黄氏</option>
+                                <option value="shicheng">石城黄氏</option>
+                                <option value="mianyang">绵阳黄氏</option>
+                                <option value="fujian">福建黄氏</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="genInput">输入代数（第几世）</label>
+                            <input type="number" id="genInput" min="1" max="999" placeholder="例如：10">
+                        </div>
+                        <button id="calcBtn" class="btn-primary">
+                            <span>推算字辈</span>
+                            <span class="btn-icon">✦</span>
+                        </button>
+                    </div>
+                    <div id="calcResult" class="result-box hidden">
+                        <div class="result-label">您的字辈是</div>
+                        <div class="result-char-wrap">
+                            <span id="resultChar" class="highlight-text"></span>
+                        </div>
+                        <div id="resultContext" class="result-context"></div>
+                        <div class="gen-sequence" id="genSequence"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 模块四：项目愿景与规划 -->
+        <section id="ppt" class="section">
+            <div class="container">
+                <div class="section-header">
+                    <div class="section-badge">PROJECT VISION</div>
+                    <h2 class="section-title">项目愿景与规划</h2>
+                    <p class="section-desc">探索黄氏家族寻根平台的宏伟蓝图与发展路径</p>
+                </div>
+
+                <!-- 幻灯片展示区 -->
+                <div class="ppt-viewer-wrap">
+                    <button class="ppt-arrow ppt-prev" id="pptPrev" aria-label="上一张">&#8249;</button>
+                    <div class="ppt-viewer">
+                        <div class="ppt-track" id="pptTrack">
+                            <!-- 幻灯片通过 JS 生成 -->
+                        </div>
+                    </div>
+                    <button class="ppt-arrow ppt-next" id="pptNext" aria-label="下一张">&#8250;</button>
+                </div>
+
+                <!-- 指示器 -->
+                <div class="ppt-indicators" id="pptIndicators"></div>
+                <div class="ppt-page-info" id="pptPageInfo">1 / 5</div>
+
+                <!-- 核心亮点卡片 -->
+                <div class="ppt-highlights">
+                    <div class="highlight-card">
+                        <span class="highlight-icon">🎯</span>
+                        <h4>文化传承</h4>
+                        <p>数字化保护千年家族文化</p>
+                    </div>
+                    <div class="highlight-card">
+                        <span class="highlight-icon">🔗</span>
+                        <h4>全球连接</h4>
+                        <p>连接五湖四海的黄氏宗亲</p>
+                    </div>
+                    <div class="highlight-card">
+                        <span class="highlight-icon">🛡️</span>
+                        <h4>安全可信</h4>
+                        <p>区块链存证确保数据真实</p>
+                    </div>
+                    <div class="highlight-card">
+                        <span class="highlight-icon">🤖</span>
+                        <h4>智能服务</h4>
+                        <p>AI 助手提供个性化咨询</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 模块五：Qwen AI 客户端 -->
+        <section id="qwen" class="section bg-alt">
+            <div class="container">
+                <div class="section-header">
+                    <div class="section-badge">QWEN AI</div>
+                    <h2 class="section-title">Qwen AI 客户端</h2>
+                    <p class="section-desc">与阿里云通义千问 AI 模型进行对话，获取智能化服务</p>
+                </div>
+                <div class="qwen-layout">
+                    <div class="qwen-chat-container card">
+                        <div class="qwen-messages" id="qwenMessages">
+                            <div class="qwen-message welcome-message">
+                                <div class="qwen-avatar ai-avatar">🤖</div>
+                                <div class="qwen-content">
+                                    <div class="qwen-name">Qwen AI</div>
+                                    <div class="qwen-text">您好！我是通义千问 AI 助手，专门为您解答关于黄氏家族寻根的相关问题。您可以问我关于族谱、字辈、历史等方面的问题。</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="qwen-input-area">
+                            <div class="qwen-multimodal-input">
+                                <textarea id="qwenInput" placeholder="请输入您想咨询的问题...（例如：黄姓的起源是什么？）"></textarea>
+                                <div class="qwen-image-upload">
+                                    <label for="qwenImageUpload" class="image-upload-label">
+                                        <span class="upload-icon">🖼️</span>
+                                        <span class="upload-text">上传图片</span>
+                                    </label>
+                                    <input type="file" id="qwenImageUpload" accept="image/*" style="display: none;">
+                                    <div id="qwenImagePreview" class="image-preview"></div>
+                                </div>
+                            </div>
+                            <div class="qwen-input-footer">
+                                <button id="qwenSendBtn" class="btn-primary">
+                                    <span>发送</span>
+                                    <span class="btn-icon">➤</span>
+                                </button>
+                                <div class="qwen-tokens">
+                                    <span>Token 用量:</span>
+                                    <span id="qwenTokens">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 配置面板（隐藏） -->
+                    <div class="qwen-config-panel card" style="display: none;">
+                        <h3 class="bc-subtitle">⚙️ 参数配置</h3>
+                        <div class="qwen-form">
+                            <div class="form-group">
+                                <label for="qwenModelSelect">选择模型</label>
+                                <select id="qwenModelSelect">
+                                    <optgroup label="千问系列模型">
+                                        <option value="qwen3.5-plus">Qwen3.5-Plus (多模态)</option>
+                                        <option value="qwen3-max-2026-01-23">Qwen3-Max-2026-01-23</option>
+                                        <option value="qwen3-coder-next">Qwen3-Coder-Next</option>
+                                        <option value="qwen3-coder-plus">Qwen3-Coder-Plus</option>
+                                        <option value="qwen-max">Qwen-Max (复杂任务)</option>
+                                        <option value="qwen-plus">Qwen-Plus (平衡性能)</option>
+                                        <option value="qwen-turbo">Qwen-Turbo (快速响应)</option>
+                                        <option value="qwen-mini">Qwen-Mini (轻量高效)</option>
+                                    </optgroup>
+                                    <optgroup label="第三方模型">
+                                        <option value="glm-5">GLM-5</option>
+                                        <option value="glm-4.7">GLM-4.7</option>
+                                        <option value="kimi-k2.5">Kimi-K2.5</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="qwenTemperature">温度 (Creativity)</label>
+                                <input type="range" id="qwenTemperature" min="0" max="1" step="0.1" value="0.7">
+                                <span id="tempValue">0.7</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="qwenApiKey">API 密钥</label>
+                                <input type="password" id="qwenApiKey" placeholder="输入您的 API 密钥">
+                            </div>
+                            <button id="qwenSaveConfig" class="btn-primary" style="width:100%;margin-top:10px;">
+                                <span>保存配置</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 模块六：区块链认证 -->
+        <section id="blockchain" class="section">
+            <div class="container">
+                <div class="section-header">
+                    <div class="section-badge">BLOCKCHAIN CERTIFICATE</div>
+                    <h2 class="section-title">区块链存证体系</h2>
+                    <p class="section-desc">哈希上链机制，确保族谱数据防篡改、可溯源</p>
+                </div>
+                <div class="blockchain-layout">
+                    <!-- 存证流程 -->
+                    <div class="bc-flow-card card">
+                        <h3 class="bc-subtitle">📜 存证流程</h3>
+                        <div class="bc-steps" id="bcSteps">
+                            <!-- JS 渲染 -->
+                        </div>
+                    </div>
+                    <!-- 在线核验 -->
+                    <div class="bc-verify-card card">
+                        <h3 class="bc-subtitle">🔍 在线核验</h3>
+                        <p class="bc-desc">输入族人 ID 或哈希值，实时验证数据真实性</p>
+                        <div class="bc-form">
+                            <input type="text" id="bcInput" placeholder="输入族人 ID (如：MBR-2024-001)" class="bc-input">
+                            <button class="btn-primary" id="bcVerifyBtn">
+                                <span>核验真伪</span>
+                                <span class="btn-icon">🔗</span>
+                            </button>
+                        </div>
+                        <div id="bcResult" class="bc-result hidden">
+                            <!-- 验证结果 -->
+                        </div>
+                        <div class="bc-records" id="bcRecords">
+                            <!-- JS 渲染示例记录 -->
+                        </div>
+                    </div>
+                </div>
+                <!-- 技术选型 -->
+                <div class="tech-stack-card card">
+                    <h3 class="bc-subtitle">🏗️ 技术选型与架构</h3>
+                    <div class="tech-items" id="techItems">
+                        <!-- JS 渲染 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 模块七：宗亲留言墙 -->
+        <section id="guestbook" class="section bg-alt">
+            <div class="container">
+                <div class="section-header">
+                    <div class="section-badge">GUESTBOOK</div>
+                    <h2 class="section-title">宗亲留言墙</h2>
+                    <p class="section-desc">发布寻亲信息，连接五湖四海的黄氏宗亲</p>
+                </div>
+                <div class="card guestbook-card">
+                    <div class="input-area">
+                        <div class="guest-name-row">
+                            <input type="text" id="guestName" placeholder="您的名字或称呼" maxlength="20" class="guest-name-input">
+                            <span class="name-hint">留空则显示"匿名宗亲"</span>
+                        </div>
+                        <textarea id="guestInput" placeholder="写下您的寻亲信息、祝福语或家族故事...&#10;&#10;例：寻找湖南宁乡黄氏宗亲，字辈为'光明正大'，望联系。" maxlength="300"></textarea>
+                        <div class="input-footer">
+                            <span id="charCount" class="char-count">0/300</span>
+                            <button id="postBtn" class="btn-primary">
+                                <span>发布留言</span>
+                                <span class="btn-icon">✉</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="guest-list" id="guestList">
+                        <!-- 留言列表 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ============================================
+         弹窗 Modal - 族人详情
+    ============================================= -->
+    <div id="modal" class="modal" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <button class="close-btn" id="closeModal" aria-label="关闭">✕</button>
+            <div class="modal-header">
+                <img src="" alt="Avatar" id="modalImg" class="modal-img" loading="lazy">
+                <div class="modal-header-info">
+                    <h3 id="modalName"></h3>
+                    <div class="modal-badge" id="modalInfo"></div>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <span class="modal-icon">📖</span>
+                    <div>
+                        <div class="modal-label">生平</div>
+                        <p class="modal-bio" id="modalBio"></p>
+                    </div>
+                </div>
+                <div class="modal-section">
+                    <span class="modal-icon">📍</span>
+                    <div>
+                        <div class="modal-label">籍贯</div>
+                        <p class="modal-loc" id="modalLoc"></p>
+                    </div>
+                </div>
+                <div class="modal-section" id="modalBcSection">
+                    <span class="modal-icon">🔗</span>
+                    <div>
+                        <div class="modal-label">区块链存证</div>
+                        <p class="modal-bc" id="modalBc"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-outline" id="modalClose2">关闭</button>
+                <button class="btn-primary" onclick="alert('功能开发中，敬请期待！')">申请认证</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================
+         Footer
+    ============================================= -->
+    <footer class="footer">
+        <div class="container footer-content">
+            <div class="footer-logo">黄氏宗亲 · 寻根平台</div>
+            <div class="footer-links">
+                <a href="#home">首页</a>
+                <a href="#tree">族谱树</a>
+                <a href="#calculator">字辈推算</a>
+                <a href="#qwen">Qwen AI</a>
+                <a href="#ppt">项目愿景</a>
+                <a href="#blockchain">区块链存证</a>
+                <a href="#guestbook">留言墙</a>
+            </div>
+            <div class="footer-info">
+                <p>© 2024 黄氏家族寻根平台 (hxfund.cn) · 传承家风，继往开来</p>
+                <p class="footer-sub">本平台为演示版本，数据仅供参考 · 保护宗亲隐私，守护家族文化</p>
+                <p class="footer-icp">
+                    <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">粤 ICP 备 16014739 号 -1</a>
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 回到顶部按钮 -->
+    <button id="backToTop" class="back-to-top" aria-label="回到顶部">↑</button>
+
+    <!-- ============================================
+         脚本文件：defer 异步加载，数据优先
+    ============================================= -->
+    <script src="/js/error-monitor.js" defer></script>
+    <script src="/js/data.js" defer></script>
+    <script src="/js/main.js" defer></script>
+    <script src="/js/modules.js" defer></script>
+    <script src="/js/script.js" defer></script>
+</body>
+</html>

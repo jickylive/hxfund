@@ -35,6 +35,9 @@ const {
 // 引入 Redis 会话存储
 const sessionStore = require('./session-store');
 
+// 引入 Waline 评论系统
+const walineRouter = require('./waline');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -92,6 +95,13 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
+
+// ============================================
+// Waline 评论系统 API
+// ============================================
+
+// Waline API 路由（兼容 Waline 前端调用）
+app.use('/api/waline', walineRouter);
 
 // ============================================
 // 配置与常量
@@ -607,6 +617,7 @@ app.get('/api/health', async (req, res) => {
   const cliConfig = getCliConfig();
   const authConfig = loadAuthConfig();
   const redisConnected = sessionStore.isRedisConnected();
+  const walineEnabled = true;
 
   // 获取会话数量
   let sessionsCount = 0;
@@ -620,7 +631,7 @@ app.get('/api/health', async (req, res) => {
   res.json({
     status: 'ok',
     service: 'huangshi-genealogy-api',
-    version: '3.2.0 (Redis + Security Hardening)',
+    version: '3.2.0 (Redis + Security + Waline)',
     timestamp: new Date().toISOString(),
     config: {
       cliConfigured,
@@ -637,6 +648,10 @@ app.get('/api/health', async (req, res) => {
         connected: redisConnected,
         url: process.env.REDIS_URL || 'redis://localhost:6379'
       },
+      waline: {
+        enabled: walineEnabled,
+        version: '1.0.0'
+      },
       sessionsCount,
       port: PORT
     }
@@ -649,7 +664,7 @@ app.get('/api/health', async (req, res) => {
  */
 app.get('/api/docs', (req, res) => {
   const authConfig = loadAuthConfig();
-  
+
   res.send(`
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -669,6 +684,7 @@ app.get('/api/docs', (req, res) => {
     .get { background: #61affe; color: white; }
     .post { background: #49cc90; color: white; }
     .delete { background: #f93e3e; color: white; }
+    .put { background: #fca130; color: white; }
     .param { margin: 5px 0; }
     .param-name { font-family: monospace; color: #1a73e8; }
     .param-type { color: #999; }
@@ -677,16 +693,23 @@ app.get('/api/docs', (req, res) => {
     th { background: #f5f5f5; }
     .auth-warning { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
     .auth-info { background: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0; }
+    .waline-info { background: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; }
   </style>
 </head>
 <body>
   <h1>📚 黄氏家族寻根平台 - API 文档</h1>
-  <p>基于阿里云百炼 Coding Plan 套餐 | 版本 3.1.0 (CLI Unified + Auth)</p>
+  <p>基于阿里云百炼 Coding Plan 套餐 | 版本 3.2.0 (CLI Unified + Auth + Waline)</p>
 
   <div class="auth-warning">
     <strong>🔐 安全认证说明：</strong>
     <p>自 v3.1.0 起，所有 API 端点（除 /api/health、/api/docs、/api/models 外）均需认证。</p>
     <p>请使用 <code>X-API-Key</code> 请求头或 <code>Authorization: Bearer &lt;token&gt;</code> 进行认证。</p>
+  </div>
+
+  <div class="waline-info">
+    <strong>💬 Waline 评论系统：</strong>
+    <p>Waline 评论 API 已集成，兼容 Waline 前端调用规范。</p>
+    <p>博客评论数据通过 <code>/api/waline</code> 路径访问。</p>
   </div>
 
   <h2>快速开始</h2>
@@ -889,21 +912,37 @@ async function chat(message) {
 app.listen(PORT, () => {
   const cliConfigured = isCliConfigured();
   const cliConfig = getCliConfig();
-  
+
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║     黄氏家族寻根平台 - Qwen AI API 服务 (CLI 统一调用)     ║
+║   黄氏家族寻根平台 - API 服务 (CLI + Waline)               ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  运行地址：http://localhost:${PORT}                         ║
 ║  API 文档：http://localhost:${PORT}/api/docs                ║
 ╠═══════════════════════════════════════════════════════════╣
-║  API 端点：                                                ║
+║  AI API 端点：                                             ║
 ║    POST /api/chat          - 单次对话                     ║
 ║    POST /api/conversation  - 多轮对话（带历史）           ║
 ║    GET  /api/session/:id   - 获取会话历史                 ║
 ║    DELETE /api/session/:id - 删除会话                     ║
 ║    GET  /api/models        - 模型列表                     ║
+╠═══════════════════════════════════════════════════════════╣
+║  Waline 评论 API 端点：                                     ║
+║    GET    /api/waline/article     - 获取文章统计          ║
+║    POST   /api/waline/article     - 更新文章统计          ║
+║    GET    /api/waline/comment     - 获取评论列表          ║
+║    POST   /api/waline/comment     - 添加评论              ║
+║    DELETE /api/waline/comment/:id - 删除评论              ║
+║    PUT    /api/waline/comment/:id - 更新评论              ║
+║    POST   /api/waline/comment/:id/like - 点赞评论         ║
+║    GET    /api/waline/user        - 用户列表              ║
+║    GET    /api/waline/system      - 系统信息              ║
+║    GET    /api/waline/health      - 健康检查              ║
+╠═══════════════════════════════════════════════════════════╣
+║  其他 API 端点：                                           ║
 ║    GET  /api/health        - 健康检查                     ║
+║    GET  /api/auth/status   - 认证状态                     ║
+║    POST /api/auth/token    - 获取 Token                   ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  CLI 路径：${CLI_PATH}                              ║
 ║  CLI 配置：${cliConfigured ? '✓ 已配置' : '✗ 未配置'}${!cliConfigured ? ' 运行 node qwen-code.js --init' : ''}

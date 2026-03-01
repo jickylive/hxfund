@@ -1,23 +1,10 @@
-# 多阶段构建 Dockerfile - 黄氏家族寻根平台后端
+# 黄氏家族寻根平台后端 - Dockerfile
+# 使用 DaoCloud 镜像源
 
 # ============================================
-# 阶段 1: 构建依赖
+# 生产环境
 # ============================================
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-# 复制 package 文件
-COPY package.json package-lock.json ./
-
-# 安装生产环境依赖
-RUN npm ci --only=production && \
-    npm cache clean --force
-
-# ============================================
-# 阶段 2: 生产环境
-# ============================================
-FROM node:18-alpine
+FROM docker.m.daocloud.io/library/node:18-alpine
 
 # 设置环境变量
 ENV NODE_ENV=production
@@ -32,12 +19,15 @@ RUN addgroup -g 1001 -S nodejs && \
 
 WORKDIR /app
 
-# 从 builder 阶段复制依赖
-COPY --from=builder /app/node_modules ./node_modules
+# 复制 package 文件
+COPY package.json package-lock.json ./
+
+# 安装生产环境依赖
+RUN npm ci --only=production && \
+    npm cache clean --force
 
 # 复制应用代码
 COPY server/ ./server/
-COPY package.json ./
 
 # 设置文件权限
 RUN chown -R nodejs:nodejs /app
