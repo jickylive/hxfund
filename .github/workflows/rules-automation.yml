@@ -13,7 +13,7 @@ on:
     paths:
       - 'rules/**'
   schedule:
-    # 每15分钟检查一次
+    # 每 15 分钟检查一次
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
@@ -23,78 +23,59 @@ jobs:
     environment: production
 
     steps:
-      - name: 📥 检出代码
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🟢 设置 Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
-      - name: 📦 安装依赖
+      - name: Install dependencies
         run: |
           cd rules
           npm install
 
-      - name: 🧪 验证规则配置
+      - name: Validate rules config
         run: |
           cd rules
           node cli.js validate
 
-      - name: 📋 列出规则
+      - name: List rules
         run: |
           cd rules
           node cli.js list
 
-      - name: 🔁 规则引擎服务启动测试
+      - name: Rule engine service test
         run: |
           cd rules
-          # 启动服务并在后台运行
           npm start &
           SERVICE_PID=$!
           echo "Started rule engine with PID: $SERVICE_PID"
-
-          # 等待服务启动
           sleep 10
-
-          # 测试 API
           if curl -f -s http://localhost:3001/api/health > /dev/null; then
-            echo "✅ Rule engine API is responding"
+            echo "Rule engine API is responding"
           else
-            echo "❌ Rule engine API is not responding"
+            echo "Rule engine API is not responding"
           fi
-
-          # 终止服务
           kill $SERVICE_PID || true
 
-      - name: 🧪 测试规则引擎
+      - name: Test rule engine
         run: |
           cd rules
           node cli.js test
 
-      - name: 📊 发送事件到规则引擎
+      - name: Send event to rule engine
         run: |
           cd rules
-
-          # 准备测试事件数据
-          cat > test-event.json << EOF
-{
-  "type": "git-commit",
-  "branch": "main",
-  "files": ["test-file.js"],
-  "timestamp": "$(date -Iseconds)"
-}
-EOF
-
-          # 如果规则引擎服务在运行，发送事件
-          # 在真实环境中，这会发送到运行中的服务
+          echo '{"type":"git-commit","branch":"main","files":["test-file.js"],"timestamp":"'$(date -Iseconds)'"}' > test-event.json
           echo "Test event prepared: $(cat test-event.json)"
 
-      - name: 📝 规则执行摘要
+      - name: Rules execution summary
         run: |
-          echo "## 规则执行摘要" >> $GITHUB_STEP_SUMMARY
-          echo "- 规则配置验证: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- 规则引擎测试: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- 服务启动测试: ✅" >> $GITHUB_STEP_SUMMARY
-          echo "- 事件处理测试: ✅" >> $GITHUB_STEP_SUMMARY
+          echo "## Rules Execution Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Rules config validation: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Rule engine test: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Service startup test: PASS" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Event processing test: PASS" >> "$GITHUB_STEP_SUMMARY"

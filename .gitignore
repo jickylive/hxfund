@@ -32,6 +32,11 @@ npm-debug.log*
 # 认证配置（敏感信息）
 server/config/auth.json
 server/config/.env
+server/config/ssl_private.key
+
+# SSL 证书（公钥可以提交，私钥必须保密）
+# server/config/ssl_certificate.crt 可以提交
+# server/config/ssl_private.key 必须保密
 
 # GitHub Actions
 .github/workflows/local-*.yml

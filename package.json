@@ -28,6 +28,7 @@
     "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "js-yaml": "^4.1.1",
     "nodemon": "^3.0.1",
     "terser": "^5.46.0"
   },

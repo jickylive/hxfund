@@ -12,7 +12,7 @@ on:
       - 'package-lock.json'
       - 'Dockerfile'
       - '.dockerignore'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
     inputs:
       target_environment:
         description: 'Target Environment'
@@ -33,8 +33,6 @@ on:
 
 env:
   NODE_VERSION: '20'
-  ECS_HOST: ${{ secrets.ECS_HOST }}
-  ECS_USER: ${{ secrets.ECS_USER }}
   APP_DIR: /var/www/hxfund-api
   APP_NAME: hxfund-api
 
@@ -52,39 +50,46 @@ jobs:
       url: ${{ vars.BACKEND_URL || 'https://api.hxfund.cn' }}
 
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🟢 Setup Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: 🔐 Configure SSH
+      - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.ECS_SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.ECS_HOST }} >> ~/.ssh/known_hosts
+        env:
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_USER: ${{ secrets.ECS_USER }}
 
-      - name: 📦 Prepare deployment package
+      - name: Prepare deployment package
         run: |
-          # 安装生产依赖
           npm ci --production
-
-          # 创建部署包
           tar -czf deploy-package.tar.gz \
             server/ \
             package.json \
             package-lock.json \
             README.md
 
-      - name: 📤 Upload to ECS via SCP
+      - name: Upload to ECS via SCP
         run: |
           scp -i ~/.ssh/id_rsa deploy-package.tar.gz ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:~/
 
-          # 如果使用Docker部署，也需要上传Docker相关文件
+          # 上传 SSL 证书文件
+          if [ -f "server/config/ssl_certificate.crt" ]; then
+            scp -i ~/.ssh/id_rsa server/config/ssl_certificate.crt ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:~/ssl_certificate.crt
+          fi
+          if [ -f "server/config/ssl_private.key" ]; then
+            scp -i ~/.ssh/id_rsa server/config/ssl_private.key ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:~/ssl_private.key
+          fi
+
           if [ "${{ inputs.deploy_method || 'pm2' }}" = "docker" ]; then
             if [ -f "Dockerfile" ]; then
               scp -i ~/.ssh/id_rsa Dockerfile ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:~/
@@ -94,87 +99,106 @@ jobs:
             fi
           fi
 
-      - name: 🚀 Deploy via PM2
+      - name: Deploy via PM2
         if: ${{ inputs.deploy_method != 'docker' }}
         run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} << 'EOF'
-            # 创建应用目录
-            mkdir -p ${{ env.APP_DIR }}
-            cd ${{ env.APP_DIR }}
+          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} bash -s << 'ENDSCRIPT'
+            set -e
+            APP_DIR="${{ env.APP_DIR }}"
+            APP_NAME="${{ env.APP_NAME }}"
 
-            # 停止旧服务
-            pm2 stop ${{ env.APP_NAME }} || echo "Service not running, continuing..."
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
 
-            # 备份当前版本
+            pm2 stop "$APP_NAME" || echo "Service not running, continuing..."
+
             if [ -d "server" ]; then
               BACKUP_NAME="backup_$(date +%Y%m%d_%H%M%S)"
               mkdir -p backups
-              cp -r server/ package*.json backups/$BACKUP_NAME/
+              cp -r server/ package*.json "backups/$BACKUP_NAME/"
               echo "Backup created: $BACKUP_NAME"
             fi
 
-            # 解压新版本
             rm -rf server/ package*.json
             tar -xzf ~/deploy-package.tar.gz
 
-            # 安装依赖
             npm ci --production
 
-            # 确保配置目录存在
             mkdir -p server/config
 
-            # 创建或更新环境变量
-            if [ ! -f "server/config/.env" ]; then
-              cat > server/config/.env << EOL
-PORT=${{ secrets.PORT || 3000 }}
-NODE_ENV=production
-ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS || 'https://hxfund.cn,https://www.hxfund.cn' }}
-REDIS_URL=${{ secrets.REDIS_URL || 'redis://localhost:6379' }}
-WALINE_MAX_PAGE_SIZE=50
-WALINE_COMMENT_MAX_LENGTH=1000
-EOL
+            # 安装 SSL 证书
+            if [ -f ~/ssl_certificate.crt ] && [ -f ~/ssl_private.key ]; then
+              # 创建 nginx 证书目录
+              sudo mkdir -p /etc/nginx/ssl
+
+              # 复制证书文件
+              sudo cp ~/ssl_certificate.crt /etc/nginx/ssl/hxfund.cn.crt
+              sudo cp ~/ssl_private.key /etc/nginx/ssl/hxfund.cn.key
+
+              # 设置正确的权限
+              sudo chmod 644 /etc/nginx/ssl/hxfund.cn.crt
+              sudo chmod 600 /etc/nginx/ssl/hxfund.cn.key
+
+              echo "SSL certificates installed successfully"
+
+              # 验证证书
+              sudo openssl x509 -in /etc/nginx/ssl/hxfund.cn.crt -noout -subject -dates 2>/dev/null && echo "Certificate verified" || true
+            else
+              echo "SSL certificate files not found, skipping installation"
             fi
 
-            # 启动服务
-            pm2 start server/index.js --name ${{ env.APP_NAME }} --time
+            if [ ! -f "server/config/.env" ]; then
+              printf '%s\n' \
+                "PORT=${{ secrets.PORT || 3000 }}" \
+                "NODE_ENV=production" \
+                "ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS || 'https://hxfund.cn,https://www.hxfund.cn' }}" \
+                "REDIS_URL=${{ secrets.REDIS_URL || 'redis://localhost:6379' }}" \
+                "WALINE_MAX_PAGE_SIZE=50" \
+                "WALINE_COMMENT_MAX_LENGTH=1000" \
+                > server/config/.env
+            fi
+
+            pm2 start server/index.js --name "$APP_NAME" --time
             pm2 save
 
-            # 等待服务启动
             sleep 5
 
-            # 检查服务状态
-            pm2 status ${{ env.APP_NAME }}
+            pm2 status "$APP_NAME"
             echo "Service logs:"
-            pm2 logs ${{ env.APP_NAME }} --lines 10
-          EOF
+            pm2 logs "$APP_NAME" --lines 10
+          ENDSCRIPT
 
-      - name: 🐳 Deploy via Docker
+      - name: Deploy via Docker
         if: ${{ inputs.deploy_method == 'docker' }}
         run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} << 'EOF'
-            # 停止旧容器
+          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} bash -s << 'ENDSCRIPT'
+            set -e
+
             docker stop hxfund-container || echo "Container not running"
             docker rm hxfund-container || echo "Container not found"
-
-            # 移除旧镜像
             docker rmi hxfund-api:latest || echo "Image not found"
 
-            # 创建应用目录
             mkdir -p /var/www/hxfund-api
-
-            # 解压部署包到应用目录
             cd /var/www/hxfund-api
             rm -rf server/ package*.json
             tar -xzf ~/deploy-package.tar.gz
 
-            # 构建新镜像
+            # 安装 SSL 证书
+            if [ -f ~/ssl_certificate.crt ] && [ -f ~/ssl_private.key ]; then
+              sudo mkdir -p /etc/nginx/ssl
+              sudo cp ~/ssl_certificate.crt /etc/nginx/ssl/hxfund.cn.crt
+              sudo cp ~/ssl_private.key /etc/nginx/ssl/hxfund.cn.key
+              sudo chmod 644 /etc/nginx/ssl/hxfund.cn.crt
+              sudo chmod 600 /etc/nginx/ssl/hxfund.cn.key
+              echo "SSL certificates installed successfully"
+            fi
+
             if [ -f "~/Dockerfile" ]; then
               cp ~/Dockerfile .
-              cp ~/*.dockerignore . 2>/dev/null || echo "No .dockerignore file"
+              cp ~/.*.dockerignore . 2>/dev/null || echo "No .dockerignore file"
 
               docker build -t hxfund-api:latest .
 
-              # 运行新容器
               docker run -d \
                 --name hxfund-container \
                 --restart unless-stopped \
@@ -187,51 +211,49 @@ EOL
               echo "Dockerfile not found, skipping Docker deployment"
             fi
 
-            # 检查容器状态
             sleep 10
             docker ps
             docker logs hxfund-container --tail 20
-          EOF
+          ENDSCRIPT
 
-      - name: 🔍 Health Check
+      - name: Health Check
         run: |
           echo "Waiting for service to be ready..."
           sleep 15
 
-          # 检查服务是否正常运行
-          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} bash -s << 'ENDSCRIPT'
+            set -e
+            APP_NAME="${{ env.APP_NAME }}"
+
             if [ "${{ inputs.deploy_method || 'pm2' }}" = "pm2" ]; then
               echo "PM2 Service Status:"
-              pm2 status ${{ env.APP_NAME }}
+              pm2 status "$APP_NAME"
               echo "Recent logs:"
-              pm2 logs ${{ env.APP_NAME }} --lines 20
+              pm2 logs "$APP_NAME" --lines 20
             else
               echo "Docker Container Status:"
               docker ps
               docker logs hxfund-container --tail 20
             fi
-          EOF
+          ENDSCRIPT
 
-          # 测试API健康检查端点
           HEALTH_CHECK_URL="https://${{ secrets.API_DOMAIN || 'api.hxfund.cn' }}/api/health"
           echo "Testing health check: $HEALTH_CHECK_URL"
 
-          # 等待几秒让服务完全就绪
           sleep 10
 
-          # 发送健康检查请求
           if curl -f -s --connect-timeout 10 --max-time 30 "$HEALTH_CHECK_URL" > /dev/null; then
-            echo "✅ Health check passed"
+            echo "Health check passed"
           else
-            echo "⚠️ Health check may have failed, checking status again..."
+            echo "Health check may have failed, checking status again..."
             curl -v --connect-timeout 10 "$HEALTH_CHECK_URL" || echo "Health check failed"
           fi
 
-      - name: 🚀 Deployment Notification
+      - name: Deployment Notification
         run: |
-          echo "✅ Backend deployment completed!"
-          echo "🌍 API endpoint: https://${{ secrets.API_DOMAIN || 'api.hxfund.cn' }}"
-          echo "🔄 Deployed branch: $GITHUB_REF_NAME"
-          echo "🆔 Commit: $GITHUB_SHA"
-          echo "🔧 Deployment method: ${{ inputs.deploy_method || 'pm2' }}"
-          echo "🏭 Service name: ${{ env.APP_NAME }}"
+          echo "Backend deployment completed!"
+          echo "API endpoint: https://${{ secrets.API_DOMAIN || 'api.hxfund.cn' }}"
+          echo "Deployed branch: $GITHUB_REF_NAME"
+          echo "Commit: $GITHUB_SHA"
+          echo "Deployment method: ${{ inputs.deploy_method || 'pm2' }}"
+          echo "Service name: ${{ env.APP_NAME }}"
