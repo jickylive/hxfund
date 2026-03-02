@@ -50,6 +50,11 @@ build/
 .nyc_output
 coverage/
 
+# 子模块博客的 node_modules
+blog/node_modules/
+blog/public/
+blog/.pending_cleanup/
+
 # Backend runtime
 logs
 *.log
