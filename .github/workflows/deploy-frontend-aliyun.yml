@@ -100,31 +100,11 @@ jobs:
             **/scripts/**
             **.md
             **.env
-          dangerous-clean-slate: false  # 不清除服务器上的现有文件
-
-      - name: 📤 Deploy to Aliyun FTP (Blog Subdirectory)
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USER }}
-          password: ${{ secrets.FTP_PASS }}
-          port: ${{ secrets.FTP_PORT || 21 }}
-          local-dir: dist/
-          server-dir: /htdocs/blog/
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/tests/**
-            **/scripts/**
-            **.md
-            **.env
-          dangerous-clean-slate: false  # 不清除服务器上的现有文件
+          dangerous-clean-slate: false
 
       - name: 🚀 Deployment Notification
         run: |
           echo "✅ Frontend deployment completed!"
           echo "🌐 Main site: https://${{ secrets.FRONTEND_DOMAIN || 'www.hxfund.cn' }}"
-          echo "📰 Blog site: https://${{ secrets.FRONTEND_DOMAIN || 'www.hxfund.cn' }}/blog/"
           echo "🔄 Deployed branch: $GITHUB_REF_NAME"
           echo "🆔 Commit: $GITHUB_SHA"
