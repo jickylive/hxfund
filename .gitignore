@@ -54,6 +54,7 @@ coverage/
 blog/node_modules/
 blog/public/
 blog/.pending_cleanup/
+blog/db.json
 
 # Backend runtime
 logs

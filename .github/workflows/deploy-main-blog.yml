@@ -181,7 +181,7 @@ jobs:
           name: hexo-blog
           path: blog/public/
 
-      - name: 📤 部署到虚拟主机 (/htdocs/public/blog/)
+      - name: 📤 部署到虚拟主机 (/htdocs/blog/)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_HOST }}
@@ -189,7 +189,7 @@ jobs:
           password: ${{ secrets.FTP_PASS }}
           port: ${{ secrets.FTP_PORT || 21 }}
           local-dir: blog/public/
-          server-dir: /htdocs/public/blog/
+          server-dir: /htdocs/blog/
           exclude: |
             **/.git*
             **/.git*/**
