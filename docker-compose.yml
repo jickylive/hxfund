@@ -8,8 +8,8 @@ services:
       dockerfile: Dockerfile
     container_name: huangshi-api
     restart: unless-stopped
-    expose:
-      - "3000"
+    ports:
+      - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -56,22 +56,26 @@ services:
         limits:
           memory: 128M
 
-  # 前端静态文件服务
-  frontend:
+  # API 反向代理 (HTTPS)
+  api-proxy:
     image: nginx:alpine
-    container_name: huangshi-frontend
+    container_name: huangshi-api-proxy
     restart: unless-stopped
-    expose:
-      - "80"
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./public:/usr/share/nginx/html:ro
-      - ./deploy/frontend-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/api-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./server/config/cert.pem:/etc/nginx/ssl/ssl_certificate.crt:ro
+      - ./server/config/private.pem:/etc/nginx/ssl/ssl_private.key:ro
     networks:
       - huangshi-network
+    depends_on:
+      - api
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 32M
 
 networks:
   huangshi-network:
