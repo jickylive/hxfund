@@ -20,14 +20,14 @@
  * 示例：
  *   node qwen-code.js "黄姓的起源是什么？"
  *   node qwen-code.js --init  # 初始化配置
- *   node qwen-code.js --git-analyze  # AI 分析 Git 历史
+ *   node qwen-code.js --git-log  # 分析 Git 提交日志
  */
 
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 
 // ============================================
 // 配置管理
@@ -161,6 +161,71 @@ const AI_TOOLS_CONFIG = {
 };
 
 // ============================================
+// Git 日志分析功能
+// ============================================
+
+function checkGitRepo() {
+  try {
+    const gitDir = execSync('git rev-parse --git-dir', { encoding: 'utf-8' }).trim();
+    return gitDir && fs.existsSync(gitDir);
+  } catch (error) {
+    return false;
+  }
+}
+
+function getGitLog(limit = 50) {
+  try {
+    const log = execSync(`git log --oneline --graph --all --date=short --pretty=format:"%C(auto)%h %C(green)%ad%C(reset) %C(dim white)-%C(reset) %s%C(yellow)%d%C(reset)" --date-order -n ${limit}`, { encoding: 'utf-8' });
+    return log;
+  } catch (error) {
+    return `Git 错误: ${error.message}`;
+  }
+}
+
+function getGitStatus() {
+  try {
+    const status = execSync('git status --porcelain', { encoding: 'utf-8' });
+    return status || '工作区干净';
+  } catch (error) {
+    return `Git 错误: ${error.message}`;
+  }
+}
+
+function getGitBranches() {
+  try {
+    const branches = execSync('git branch -v --all', { encoding: 'utf-8' });
+    return branches;
+  } catch (error) {
+    return `Git 错误: ${error.message}`;
+  }
+}
+
+async function analyzeGitWithAI(config, gitLog) {
+  console.log('🤖 正在使用 AI 分析 Git 提交历史...\n');
+
+  const prompt = `请分析以下 Git 提交历史记录，并提供简洁的总结：
+
+${gitLog.substring(0, 3000)}
+
+请按以下格式提供分析：
+1. 最近的主要变更
+2. 代码提交趋势
+3. 重要的功能或修复
+4. 任何值得注意的模式或问题
+
+请用中文回答。`;
+
+  try {
+    const result = await callQwenAPI(config, prompt, []);
+    console.log(`📋 Git 提交历史 AI 分析:\n`);
+    console.log(`${result.content}\n`);
+    console.log(`📊 Token 用量：${result.usage?.total_tokens || 0}\n`);
+  } catch (error) {
+    console.log(`❌ AI 分析失败：${error.message}\n`);
+  }
+}
+
+// ============================================
 // 工具函数
 // ============================================
 
@@ -199,7 +264,7 @@ function expandHome(filePath) {
 function printAsciiArt() {
   console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║         黄氏家族寻根 · Qwen Code CLI                       ║
+║         黄氏家族寻根 · Qwen Code CLI (Git 增强版)         ║
 ║         基于阿里云百炼 Coding Plan                         ║
 ╚═══════════════════════════════════════════════════════════╝
   `);
@@ -219,6 +284,10 @@ function printHelp() {
   --tools                 列出支持的 AI 工具
   -i, --interactive       交互模式
   --list-models           列出支持的模型
+  --git-log               分析 Git 提交历史
+  --git-status            显示 Git 状态
+  --git-branches          显示 Git 分支
+  --git-analyze           使用 AI 分析 Git 历史
 
 示例:
   node qwen-code.js "黄姓的起源是什么？"
@@ -226,6 +295,8 @@ function printHelp() {
   node qwen-code.js -i  # 进入交互模式
   node qwen-code.js --init  # 初始化配置向导
   node qwen-code.js --tools  # 查看支持的 AI 工具
+  node qwen-code.js --git-log  # 显示 Git 提交历史
+  node qwen-code.js --git-analyze  # AI 分析 Git 历史
 
 支持的模型:
 ${SUPPORTED_MODELS.map(m => `  - ${m.id}${m.default ? ' (默认)' : ''}${m.thinking ? ' (支持思考模式)' : ''}`).join('\n')}
@@ -288,17 +359,23 @@ async function initWizard() {
   }
   console.log('');
 
-  // 步骤 2: 选择 AI 工具
-  console.log('步骤 2/5: 选择要配置的 AI 工具');
+  // 步骤 2: 检查 Git 环境
+  console.log('步骤 2/5: 检查 Git 环境');
+  const hasGit = checkGitRepo();
+  console.log(`  Git 仓库：${hasGit ? '✅ 已找到' : '❌ 未找到或不在 Git 仓库中'}`);
+  console.log('');
+
+  // 步骤 3: 选择 AI 工具
+  console.log('步骤 3/5: 选择要配置的 AI 工具');
   console.log('  1. Qwen Code (官方 CLI)');
   console.log('  2. OpenCode');
   console.log('  3. Claude Code');
   console.log('  4. Cline (VS Code 插件)');
   console.log('  5. Cursor');
   console.log('  6. 仅配置本 CLI 工具');
-  
+
   const toolChoice = await question('请选择 (1-6): ');
-  
+
   let selectedTool = null;
   switch (toolChoice) {
     case '1': selectedTool = 'qwenCode'; break;
@@ -311,22 +388,22 @@ async function initWizard() {
   }
   console.log('');
 
-  // 步骤 3: 获取 API Key
-  console.log('步骤 3/5: 配置 API Key');
+  // 步骤 4: 获取 API Key
+  console.log('步骤 4/5: 配置 API Key');
   console.log('获取 API Key: https://bailian.console.aliyun.com/cn-beijing/?tab=service#/coding-plan');
   const apiKey = await question('请输入 Coding Plan API Key (sk-sp-xxxxx): ');
-  
+
   if (!apiKey.startsWith('sk-sp-')) {
     console.log('  ⚠️  警告：API Key 格式应为 sk-sp-xxxxx (Coding Plan 专属)');
   }
   console.log('');
 
-  // 步骤 4: 选择模型
-  console.log('步骤 4/5: 选择默认模型');
+  // 步骤 5: 选择模型
+  console.log('步骤 5/5: 选择默认模型');
   SUPPORTED_MODELS.forEach((m, i) => {
     console.log(`  ${i + 1}. ${m.id}${m.default ? ' [推荐]' : ''}${m.thinking ? ' (支持思考)' : ''}`);
   });
-  
+
   const modelChoice = await question(`\n请输入模型编号 (1-${SUPPORTED_MODELS.length}, 回车跳过): `);
   const modelIndex = parseInt(modelChoice) - 1;
   let selectedModel = DEFAULT_CONFIG.model;
@@ -335,9 +412,9 @@ async function initWizard() {
   }
   console.log('');
 
-  // 步骤 5: 保存配置
-  console.log('步骤 5/5: 保存配置');
-  
+  // 步骤 6: 保存配置
+  console.log('步骤 6/6: 保存配置');
+
   const config = {
     apiKey: apiKey.trim(),
     baseURL: 'https://coding.dashscope.aliyuncs.com/v1',
@@ -356,7 +433,7 @@ async function initWizard() {
   if (selectedTool !== 'cli' && AI_TOOLS_CONFIG[selectedTool]) {
     const tool = AI_TOOLS_CONFIG[selectedTool];
     console.log(`\n正在配置 ${tool.name}...`);
-    
+
     if (selectedTool === 'opencode') {
       await configureOpenCode(tool, apiKey);
     } else if (selectedTool === 'qwenCode') {
@@ -391,7 +468,7 @@ async function initWizard() {
 async function configureOpenCode(tool, apiKey) {
   const configPath = expandHome(tool.configPath);
   const configDir = path.dirname(configPath);
-  
+
   try {
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true });
@@ -401,15 +478,15 @@ async function configureOpenCode(tool, apiKey) {
     // 创建配置文件（替换 API Key）
     const configContent = JSON.stringify(tool.configTemplate, null, 2)
       .replace(/YOUR_API_KEY/g, apiKey);
-    
+
     fs.writeFileSync(configPath, configContent, 'utf-8');
     console.log(`  ✅ OpenCode 配置已保存到：${configPath}`);
-    
+
     console.log('\n  使用 OpenCode:');
     console.log('  1. 运行：opencode');
     console.log('  2. 输入：/models');
     console.log('  3. 选择：Model Studio Coding Plan');
-    
+
   } catch (error) {
     console.log(`  ❌ 配置失败：${error.message}`);
   }
@@ -417,7 +494,7 @@ async function configureOpenCode(tool, apiKey) {
 
 async function testConfig(config) {
   console.log('正在测试配置...\n');
-  
+
   try {
     const result = await callQwenAPI(config, '你好，请简单自我介绍', []);
     console.log(`✅ 测试成功!`);
@@ -515,12 +592,59 @@ function callQwenAPI(config, prompt, conversationHistory = []) {
 }
 
 // ============================================
+// Git 相关功能
+// ============================================
+
+function showGitLog() {
+  if (!checkGitRepo()) {
+    console.log('❌ 当前目录不是 Git 仓库');
+    return;
+  }
+
+  console.log('📋 Git 提交历史:\n');
+  const gitLog = getGitLog(20);
+  console.log(gitLog);
+}
+
+function showGitStatus() {
+  if (!checkGitRepo()) {
+    console.log('❌ 当前目录不是 Git 仓库');
+    return;
+  }
+
+  console.log('📊 Git 状态:\n');
+  const gitStatus = getGitStatus();
+  console.log(gitStatus);
+}
+
+function showGitBranches() {
+  if (!checkGitRepo()) {
+    console.log('❌ 当前目录不是 Git 仓库');
+    return;
+  }
+
+  console.log('🌿 Git 分支:\n');
+  const gitBranches = getGitBranches();
+  console.log(gitBranches);
+}
+
+async function analyzeGitHistory(config) {
+  if (!checkGitRepo()) {
+    console.log('❌ 当前目录不是 Git 仓库');
+    return;
+  }
+
+  const gitLog = getGitLog(50);
+  await analyzeGitWithAI(config, gitLog);
+}
+
+// ============================================
 // 交互模式
 // ============================================
 
 async function interactiveMode(config) {
   console.log('\n进入交互模式 (输入 /quit 退出，/clear 清空对话，/help 查看命令)\n');
-  
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
@@ -531,21 +655,21 @@ async function interactiveMode(config) {
   const askQuestion = () => {
     rl.question('🧑 你：', async (input) => {
       const trimmed = input.trim();
-      
+
       // 处理特殊命令
       if (trimmed === '/quit' || trimmed === '/exit') {
         console.log('👋 再见！');
         rl.close();
         return;
       }
-      
+
       if (trimmed === '/clear') {
         conversationHistory.length = 0;
         console.log('✓ 对话历史已清空\n');
         askQuestion();
         return;
       }
-      
+
       if (trimmed === '/help') {
         console.log(`
 命令列表:
@@ -556,12 +680,40 @@ async function interactiveMode(config) {
   /history      - 查看对话历史
   /usage        - 查看 Token 用量
   /config       - 查看当前配置
+  /git-log      - 显示 Git 提交历史
+  /git-status   - 显示 Git 状态
+  /git-branch   - 显示 Git 分支
+  /git-analyze  - AI 分析 Git 历史
 
 直接输入问题即可与 AI 对话。\n`);
         askQuestion();
         return;
       }
-      
+
+      if (trimmed === '/git-log') {
+        showGitLog();
+        askQuestion();
+        return;
+      }
+
+      if (trimmed === '/git-status') {
+        showGitStatus();
+        askQuestion();
+        return;
+      }
+
+      if (trimmed === '/git-branch') {
+        showGitBranches();
+        askQuestion();
+        return;
+      }
+
+      if (trimmed === '/git-analyze') {
+        await analyzeGitHistory(config);
+        askQuestion();
+        return;
+      }
+
       if (trimmed === '/model') {
         console.log(`\n当前模型：${config.model}\n`);
         console.log('可用模型:');
@@ -576,7 +728,7 @@ async function interactiveMode(config) {
         askQuestion();
         return;
       }
-      
+
       if (trimmed.startsWith('/model ')) {
         const newModel = trimmed.replace('/model ', '').trim();
         if (SUPPORTED_MODELS.some(m => m.id === newModel)) {
@@ -589,7 +741,7 @@ async function interactiveMode(config) {
         askQuestion();
         return;
       }
-      
+
       if (trimmed === '/config') {
         console.log('\n当前配置:');
         console.log(`  API Key: ${config.apiKey.substring(0, 12)}...`);
@@ -600,7 +752,7 @@ async function interactiveMode(config) {
         askQuestion();
         return;
       }
-      
+
       if (trimmed === '/history') {
         console.log('\n对话历史:');
         conversationHistory.forEach((msg, i) => {
@@ -612,7 +764,7 @@ async function interactiveMode(config) {
         askQuestion();
         return;
       }
-      
+
       if (trimmed === '/usage') {
         console.log(`\n当前会话 Token 用量统计:\n`);
         const totalChars = conversationHistory.reduce((sum, msg) => sum + msg.content.length, 0);
@@ -621,32 +773,32 @@ async function interactiveMode(config) {
         askQuestion();
         return;
       }
-      
+
       if (!trimmed) {
         askQuestion();
         return;
       }
-      
+
       // 调用 API
       console.log('🤖 AI 思考中...\n');
-      
+
       try {
         const result = await callQwenAPI(config, trimmed, conversationHistory);
-        
+
         console.log(`\n🤖 AI: ${result.content}\n`);
-        
+
         // 保存到对话历史
         conversationHistory.push({ role: 'user', content: trimmed });
         conversationHistory.push({ role: 'assistant', content: result.content });
-        
+
         if (result.usage.total_tokens) {
           console.log(`📊 Token 用量：${result.usage.total_tokens} (本次请求)\n`);
         }
-        
+
       } catch (error) {
         console.log(`\n❌ 错误：${error.message}\n`);
       }
-      
+
       askQuestion();
     });
   };
@@ -661,11 +813,11 @@ async function interactiveMode(config) {
 async function singleQuestionMode(config, question) {
   try {
     console.log('🤖 AI 思考中...\n');
-    
+
     const result = await callQwenAPI(config, question);
-    
+
     console.log(`🤖 AI: ${result.content}\n`);
-    
+
     if (result.usage.total_tokens) {
       console.log(`📊 Token 用量：${result.usage.total_tokens}`);
     }
@@ -702,10 +854,14 @@ async function main() {
   let showTools = false;
   let showInit = false;
   let interactive = false;
+  let showGitLog = false;
+  let showGitStatus = false;
+  let showGitBranches = false;
+  let analyzeGit = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    
+
     if (arg === '-h' || arg === '--help') {
       showHelp = true;
     } else if (arg === '-v' || arg === '--version') {
@@ -720,6 +876,14 @@ async function main() {
       interactive = true;
     } else if (arg === '--list-models') {
       showModels = true;
+    } else if (arg === '--git-log') {
+      showGitLog = true;
+    } else if (arg === '--git-status') {
+      showGitStatus = true;
+    } else if (arg === '--git-branches') {
+      showGitBranches = true;
+    } else if (arg === '--git-analyze') {
+      analyzeGit = true;
     } else if (arg === '-m' || arg === '--model') {
       if (args[i + 1]) {
         config.model = args[++i];
@@ -739,7 +903,7 @@ async function main() {
   }
 
   if (showVersion) {
-    console.log('Qwen Code CLI v1.1.0 (增强版)');
+    console.log('Qwen Code CLI v2.0.0 (Git 增强版)');
     return;
   }
 
@@ -760,6 +924,31 @@ async function main() {
 
   if (showConfig) {
     await initWizard();
+    return;
+  }
+
+  if (showGitLog) {
+    showGitLog();
+    return;
+  }
+
+  if (showGitStatus) {
+    showGitStatus();
+    return;
+  }
+
+  if (showGitBranches) {
+    showGitBranches();
+    return;
+  }
+
+  if (analyzeGit) {
+    if (!config.apiKey) {
+      console.error('❌ 错误：未配置 API Key');
+      console.log('请使用 --init 选项先配置 API Key');
+      process.exit(1);
+    }
+    await analyzeGitHistory(config);
     return;
   }
 
