@@ -294,7 +294,7 @@ pm2 restart hxfund-api
 
 | 文档 | 说明 |
 |------|------|
-| [INTEGRATION_PLAN.md](../INTEGRATION_PLAN.md) | 完整整合方案 |
+| [INTEGRATION_PLAN.md](./docs/INTEGRATION_PLAN.md) | 完整整合方案 |
 | [DNS 配置指南.md](./DNS 配置指南.md) | DNS 设置 |
 | [阿里云部署指南.md](./阿里云部署指南.md) | 详细部署步骤 |
 | [deploy-integration.yml](../.github/workflows/deploy-integration.yml) | GitHub Actions |

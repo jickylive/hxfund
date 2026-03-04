@@ -225,7 +225,7 @@ lftp qxu1606470020.my3w.com
 |------|------|
 | [deploy-integration.yml](../.github/workflows/deploy-integration.yml) | 统一部署工作流 |
 | [deploy-frontend-aliyun.yml](../.github/workflows/deploy-frontend-aliyun.yml) | 前端部署配置 |
-| [INTEGRATION_PLAN.md](../INTEGRATION_PLAN.md) | 完整整合方案 |
+| [INTEGRATION_PLAN.md](./docs/INTEGRATION_PLAN.md) | 完整整合方案 |
 
 ---
 

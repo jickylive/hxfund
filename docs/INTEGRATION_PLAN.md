@@ -317,7 +317,7 @@ ls /htdocs/blog/
 - `docs/BLOG_DEPLOYMENT_GUIDE.md` - 博客部署
 - `deploy/DNS 配置指南.md` - DNS 配置
 - `deploy/DNS 状态检查报告.md` - DNS 检查报告
-- `WALINE_INTEGRATION.md` - Waline 评论整合
+- `./WALINE_INTEGRATION.md` - Waline 评论整合
 - `.github/workflows/deploy-integration.yml` - 统一工作流
 
 ---

@@ -413,7 +413,7 @@ waline:
 ## 🔗 相关文档
 
 - [Waline 官方文档](https://waline.js.org/)
-- [INTEGRATION_PLAN.md](../INTEGRATION_PLAN.md)
+- [INTEGRATION_PLAN.md](./INTEGRATION_PLAN.md)
 - [DNS 状态检查报告.md](./DNS 状态检查报告.md)
 - [deploy/README.md](./README.md)
 

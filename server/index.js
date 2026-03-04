@@ -215,7 +215,7 @@ function calculateSessionSize(messages) {
  */
 app.post('/api/auth/token', (req, res) => {
   const config = loadAuthConfig();
-  const { clientKey } = req.body;
+  const { apiKey: clientKey } = req.body;
 
   // 验证客户端密钥（防止未授权调用）
   if (!clientKey || clientKey !== config.serverApiKey) {

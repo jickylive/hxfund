@@ -180,7 +180,7 @@ DNS 修改后，HTTPS 证书可能需要重新验证。
 
 ## 🔗 相关文档
 
-- `../INTEGRATION_PLAN.md` - 项目整合方案
+- `./docs/INTEGRATION_PLAN.md` - 项目整合方案
 - `../deploy/阿里云部署指南.md` - 部署指南
 - `../.github/workflows/deploy-integration.yml` - 部署工作流
 

@@ -66,7 +66,7 @@ function request(path, options = {}) {
 
 // 加载 API Key
 function loadApiKey() {
-  const authConfigPath = path.join(__dirname, 'server', 'config', 'auth.json');
+  const authConfigPath = path.join(__dirname, '..' , 'server', 'config', 'auth.json');
   try {
     if (fs.existsSync(authConfigPath)) {
       const config = JSON.parse(fs.readFileSync(authConfigPath, 'utf-8'));
@@ -168,7 +168,7 @@ async function runTests() {
     const res = await request('/api/auth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: { apiKey }
+      body: { apiKey: apiKey }
     });
     if (res.status === 200 && res.data.success) {
       authToken = res.data.token;
@@ -191,9 +191,9 @@ async function runTests() {
     const res = await request('/api/auth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: { apiKey: 'hs_invalid_key_12345' }
+      body: { clientKey: 'hs_invalid_key_12345' }
     });
-    if (res.status === 403 && res.data.code === 'INVALID_API_KEY') {
+    if (res.status === 403 && res.data.code === 'INVALID_CLIENT_KEY') {
       log(colors.green, '✓ 无效 API Key 拦截正确');
       passed++;
     } else {
