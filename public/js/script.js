@@ -117,6 +117,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('获取认证 Token 失败:', error.message);
+            
+            // 显示友好的错误提示给用户
+            addMessage('ai', `⚠️ 网络连接问题：${error.message}<br>请检查网络连接或稍后重试。`);
+            
             // 网络错误等情况下返回 null
             return null;
         }
@@ -135,12 +139,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentModel && data.models.some(m => m.id === currentModel)) {
                     qwenModelSelect.value = currentModel;
                 }
-                
+
                 // 获取认证 Token
                 await getAuthToken();
+            } else {
+                console.warn('加载模型列表失败:', data.error || '未知错误');
+                addMessage('ai', `⚠️ 模型列表加载失败：${data.error || '无法连接到服务'}`);
             }
         } catch (error) {
-            console.warn('加载模型列表失败:', error.message);
+            console.error('加载模型列表失败:', error.message);
+            addMessage('ai', `⚠️ 网络错误：${error.message}<br>无法加载模型列表，请检查网络连接。`);
         }
     }
 
@@ -180,6 +188,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function callConversationAPI(message, model, temperature) {
         // 确保有有效的 Token
         const token = await getAuthToken();
+
+        // 如果获取不到 token，返回错误信息
+        if (!token) {
+            throw new Error('无法获取认证令牌，请检查网络连接或联系管理员');
+        }
 
         // 构建请求头
         const headers = { 'Content-Type': 'application/json' };
@@ -292,7 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 // 更新会话 ID
                 sessionId = data.sessionId;
-                
+
                 // 添加 AI 响应
                 addMessage('ai', data.response);
 
@@ -306,6 +319,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             qwenMessages.removeChild(loadingDiv);
             addMessage('ai', `抱歉，出现错误：${error.message}`);
+            
+            // 如果是认证相关的错误，提示用户可能需要重新加载页面
+            if (error.message.includes('认证令牌') || error.message.includes('Token')) {
+                addMessage('ai', `💡 提示：如果问题持续，请尝试刷新页面重新连接。`);
+            }
         }
     }
 
@@ -318,6 +336,35 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMessage();
         }
     });
+
+    // 添加刷新认证按钮功能
+    const refreshTokenBtn = document.createElement('button');
+    refreshTokenBtn.className = 'btn-outline';
+    refreshTokenBtn.innerHTML = '<span>🔄 刷新连接</span>';
+    refreshTokenBtn.style.marginLeft = '10px';
+    refreshTokenBtn.style.padding = '8px 12px';
+    refreshTokenBtn.style.fontSize = '0.9rem';
+    
+    const qwenInputFooter = document.querySelector('.qwen-input-footer');
+    if (qwenInputFooter) {
+        qwenInputFooter.appendChild(refreshTokenBtn);
+        
+        refreshTokenBtn.addEventListener('click', async () => {
+            // 清除现有令牌
+            authToken = null;
+            tokenExpiresAt = null;
+            sessionStorage.removeItem('authToken');
+            sessionStorage.removeItem('tokenExpiresAt');
+            
+            // 尝试获取新令牌
+            const newToken = await getAuthToken();
+            if (newToken) {
+                addMessage('ai', '✅ 连接已刷新，可以继续使用 AI 服务。');
+            } else {
+                addMessage('ai', '❌ 连接刷新失败，请检查网络或稍后重试。');
+            }
+        });
+    }
 
     // 初始化
     loadConfig();

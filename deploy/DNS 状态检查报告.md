@@ -179,7 +179,7 @@ TTL: 10 分钟
 ## 🔗 相关文档
 
 - [DNS 配置指南.md](../deploy/DNS 配置指南.md)
-- [INTEGRATION_PLAN.md](../INTEGRATION_PLAN.md)
+- [INTEGRATION_PLAN.md](./docs/INTEGRATION_PLAN.md)
 - [deploy/README.md](../deploy/README.md)
 
 ---

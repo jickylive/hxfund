@@ -26,7 +26,7 @@ function log(color, message) {
 
 // 加载 API Key
 function loadApiKey() {
-  const authConfigPath = path.join(__dirname, 'server', 'config', 'auth.json');
+  const authConfigPath = path.join(__dirname, '..' , 'server', 'config', 'auth.json');
   try {
     if (fs.existsSync(authConfigPath)) {
       const config = JSON.parse(fs.readFileSync(authConfigPath, 'utf-8'));
