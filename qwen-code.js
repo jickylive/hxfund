@@ -1,24 +1,26 @@
 #!/usr/bin/env node
 /**
- * 黄氏家族寻根平台 - Qwen Code CLI 工具（增强版）
- * 
+ * 黄氏家族寻根平台 - Qwen Code CLI 工具（增强版 + Git 集成）
+ *
  * 基于阿里云百炼 Coding Plan 套餐
  * 使用方式：交互式编程助手（符合 Coding Plan 使用限制）
- * 
+ *
  * 功能特性：
  * - 支持 Qwen Code、Claude Code、Cline、OpenCode 等多种 AI 工具配置
  * - 一键初始化配置
  * - 交互式对话
  * - 模型切换
- * 
+ * - Git 日志分析功能
+ *
  * 使用方法：
  *   node qwen-code.js [问题]
  *   node qwen-code.js --help
  *   node qwen-code.js --init
- * 
+ *
  * 示例：
  *   node qwen-code.js "黄姓的起源是什么？"
  *   node qwen-code.js --init  # 初始化配置
+ *   node qwen-code.js --git-analyze  # AI 分析 Git 历史
  */
 
 const https = require('https');

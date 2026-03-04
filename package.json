@@ -11,8 +11,11 @@
     "build:prod": "node scripts/build.js && echo '构建完成，准备部署'",
     "deploy:frontend": "echo '使用 GitHub Actions 部署前端'",
     "deploy:backend": "echo '使用 GitHub Actions 部署后端'",
-    "qwen": "node scripts/qwen-code.js",
-    "qwen:i": "node scripts/qwen-code.js -i",
+    "qwen": "node qwen-code.js",
+    "qwen:git": "node qwen-code-git.js",
+    "qwen:i": "node qwen-code.js -i",
+    "qwen:init": "node qwen-code.js --init",
+    "qwen:git-analyze": "node qwen-code-git.js --git-analyze",
     "test": "node tests/test-api.js && node tests/test-auth.js && node tests/test-chat.js",
     "test:ci": "npm test -- --ci"
   },
