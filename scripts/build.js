@@ -264,6 +264,14 @@ async function build() {
     } else {
         console.log('  ℹ️  images 目录不存在，跳过');
     }
+
+    // 复制 PWA 相关资源
+    const pwaSrc = path.join(PUBLIC_DIR, 'pwa');
+    if (fs.existsSync(pwaSrc)) {
+        copyDir(pwaSrc, path.join(DIST_DIR, 'pwa'));
+    } else {
+        console.log('  ℹ️  pwa 目录不存在，跳过');
+    }
     
     // 处理 CSS
     const cssStats = processCSS();

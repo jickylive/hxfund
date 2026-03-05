@@ -480,5 +480,82 @@
     <script src="/js/main.js" defer></script>
     <script src="/js/modules.js" defer></script>
     <script src="/js/script.js" defer></script>
+    <!-- Web Vitals 监控（生产环境启用） -->
+    <script>
+      // 只在生产环境加载 Web Vitals 监控
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        // 动态加载 web-vitals 库
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/web-vitals@3/dist/web-vitals.iife.js';
+        script.onload = function() {
+          // 加载完成后初始化监控
+          webVitals.getCLS(metric => {
+            if ('sendBeacon' in navigator) {
+              const data = JSON.stringify({
+                metric: metric,
+                timestamp: Date.now(),
+                url: window.location.href,
+                userAgent: navigator.userAgent
+              });
+              const blob = new Blob([data], { type: 'application/json' });
+              navigator.sendBeacon('/api/performance/metrics', blob);
+            }
+          });
+          
+          webVitals.getFID(metric => {
+            if ('sendBeacon' in navigator) {
+              const data = JSON.stringify({
+                metric: metric,
+                timestamp: Date.now(),
+                url: window.location.href,
+                userAgent: navigator.userAgent
+              });
+              const blob = new Blob([data], { type: 'application/json' });
+              navigator.sendBeacon('/api/performance/metrics', blob);
+            }
+          });
+          
+          webVitals.getFCP(metric => {
+            if ('sendBeacon' in navigator) {
+              const data = JSON.stringify({
+                metric: metric,
+                timestamp: Date.now(),
+                url: window.location.href,
+                userAgent: navigator.userAgent
+              });
+              const blob = new Blob([data], { type: 'application/json' });
+              navigator.sendBeacon('/api/performance/metrics', blob);
+            }
+          });
+          
+          webVitals.getLCP(metric => {
+            if ('sendBeacon' in navigator) {
+              const data = JSON.stringify({
+                metric: metric,
+                timestamp: Date.now(),
+                url: window.location.href,
+                userAgent: navigator.userAgent
+              });
+              const blob = new Blob([data], { type: 'application/json' });
+              navigator.sendBeacon('/api/performance/metrics', blob);
+            }
+          });
+          
+          webVitals.getTTFB(metric => {
+            if ('sendBeacon' in navigator) {
+              const data = JSON.stringify({
+                metric: metric,
+                timestamp: Date.now(),
+                url: window.location.href,
+                userAgent: navigator.userAgent
+              });
+              const blob = new Blob([data], { type: 'application/json' });
+              navigator.sendBeacon('/api/performance/metrics', blob);
+            }
+          });
+        };
+        document.head.appendChild(script);
+      }
+    </script>
 </body>
 </html>
