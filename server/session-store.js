@@ -1,11 +1,12 @@
 /**
  * 黄氏家族寻根平台 - Redis 会话存储模块
- * 
+ *
  * 功能：
  * - 使用 Redis 存储会话数据，支持多实例部署
  * - 自动过期清理
  * - 内存存储降级方案（无 Redis 时）
- * 
+ * - 会话数据备份与压缩
+ *
  * 使用方法：
  * const sessionStore = require('./session-store');
  * await sessionStore.set(sessionId, data);
@@ -13,6 +14,7 @@
  */
 
 const redis = require('redis');
+const SessionBackupManager = require('./session-backup');
 
 // 配置
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
@@ -25,6 +27,13 @@ let isRedisConnected = false;
 
 // 内存存储降级方案
 const memoryStore = new Map();
+
+// 会话备份管理器
+const backupManager = new SessionBackupManager({
+  backupDir: process.env.SESSION_BACKUP_DIR || './backups',
+  retentionDays: parseInt(process.env.SESSION_RETENTION_DAYS) || 30,
+  compress: process.env.SESSION_COMPRESS !== 'false'
+});
 
 /**
  * 初始化 Redis 连接
@@ -189,8 +198,61 @@ async function closeRedis() {
   }
 }
 
+/**
+ * 备份所有会话数据
+ */
+async function backupSessions() {
+  return await backupManager.backupSessions(module.exports);
+}
+
+/**
+ * 恢复会话数据
+ */
+async function restoreSessions(backupFileName) {
+  return await backupManager.restoreSessions(backupFileName, module.exports);
+}
+
+/**
+ * 获取备份文件列表
+ */
+function getBackupFiles() {
+  return backupManager.getBackupFiles();
+}
+
+/**
+ * 获取备份统计信息
+ */
+function getBackupStats() {
+  return backupManager.getBackupStats();
+}
+
 // 自动初始化 Redis
 initRedis();
+
+// 设置定时备份（每天凌晨 2 点执行）
+const scheduleBackup = () => {
+  const now = new Date();
+  const nextBackup = new Date();
+  nextBackup.setHours(2, 0, 0, 0); // 凌晨 2 点
+  
+  // 如果已经过了今天的备份时间，则设置为明天
+  if (now.getHours() >= 2) {
+    nextBackup.setDate(nextBackup.getDate() + 1);
+  }
+  
+  const timeUntilBackup = nextBackup - now;
+  
+  setTimeout(async () => {
+    console.log('[Session Backup] 开始执行定期会话数据备份...');
+    await backupSessions();
+    
+    // 设置下次备份
+    scheduleBackup();
+  }, timeUntilBackup);
+};
+
+// 启动时安排第一次备份
+setTimeout(scheduleBackup, 5000); // 5秒后开始第一次备份调度
 
 module.exports = {
   getSession,
@@ -199,5 +261,10 @@ module.exports = {
   getAllSessions,
   closeRedis,
   isRedisConnected: () => isRedisConnected,
-  initRedis
+  initRedis,
+  // 备份相关方法
+  backupSessions,
+  restoreSessions,
+  getBackupFiles,
+  getBackupStats
 };

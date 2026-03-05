@@ -1,21 +1,30 @@
 /**
  * 黄氏家族寻根平台 - Qwen AI API 服务
  * 基于阿里云百炼 Coding Plan 套餐
- * 
+ *
  * API 文档：/api/docs
  * 健康检查：/api/health
- * 
+ *
  * 部署说明:
  * 1. 复制 config/.env.example 为 config/.env
  * 2. 配置 QWEN_API_KEY
  * 3. 运行：npm start
- * 
+ *
  * 统一使用 qwen-code.js CLI 工具调用 AI
  */
+
+// 初始化 Sentry 错误监控（首先加载）
+const { initSentry, setupGlobalHandlers } = require('./sentry');
+initSentry();
+setupGlobalHandlers();
 
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const compression = require('compression');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const session = require('express-session');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config({ path: path.join(__dirname, 'config', '.env') });
@@ -29,7 +38,8 @@ const {
   initAuthConfig,
   loadAuthConfig,
   generateTokenHandler,
-  generateApiKey
+  generateApiKey,
+  generateToken
 } = require('./auth');
 
 // 引入 Redis 会话存储
@@ -42,8 +52,51 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ============================================
-// 中间件
+// 安全中间件
 // ============================================
+
+// 压缩响应
+app.use(compression());
+
+// 安全头
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:", "http:"],
+      scriptSrc: ["'self'", "https://unpkg.com", "https://cdn.jsdelivr.net"],
+      imgSrc: ["'self'", "data:", "https:", "http:"],
+      connectSrc: ["'self'", "https://coding.dashscope.aliyuncs.com", "https://*.aliyuncs.com"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  hsts: {
+    maxAge: 31536000, // 1年
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
+// 速率限制
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15分钟
+  max: 100, // 限制每个IP 15分钟内最多100个请求
+  message: '请求过于频繁，请稍后再试',
+  standardHeaders: true, // 返回速率限制信息
+  legacyHeaders: false, // 不使用x-rate-limit头
+});
+app.use(limiter);
+
+// Sentry 请求追踪中间件（在其他中间件之前）
+try {
+  const Sentry = require('@sentry/node');
+  app.use(Sentry.Handlers.requestHandler());
+  app.use(Sentry.Handlers.tracingHandler());
+} catch (error) {
+  console.warn('⚠️  Sentry 未配置，跳过请求追踪中间件:', error.message);
+}
 
 // 初始化认证配置
 initAuthConfig();
@@ -62,9 +115,11 @@ const corsOptions = {
     // 严格验证域名：精确匹配或子域名匹配
     // 使用正则防止 evil-hxfund.cn 绕过
     const isExactMatch = allowedOrigins.indexOf(origin) !== -1;
-    const isSubdomainMatch = /^https?:\/\/([\w-]+\.)*hxfund\.cn(:\d+)?$/.test(origin);
+    const isHxfundDomain = /^https?:\/\/([\w-]+\.)*hxfund\.cn(:\d+)?$/.test(origin);
+    const isMy3wDomain = /^https?:\/\/([\w-]+\.)*my3w\.com(:\d+)?$/.test(origin); // 添加对my3w域名的支持
+    const isApiHxfundDomain = origin === 'https://api.hxfund.cn'; // 添加对API域名的支持
 
-    if (isExactMatch || isSubdomainMatch) {
+    if (isExactMatch || isHxfundDomain || isMy3wDomain || isApiHxfundDomain) {
       callback(null, true);
     } else {
       callback(new Error('不允许的跨域请求'));
@@ -248,11 +303,13 @@ app.post('/api/auth/client-token', (req, res) => {
 
   // 严格验证域名（防止绕过）
   const isExactMatch = origin && allowedOrigins.indexOf(origin) !== -1;
-  const isSubdomainMatch = origin && /^https?:\/\/([\w-]+\.)*hxfund\.cn(:\d+)?$/.test(origin);
-  const isRefererValid = referer && (referer.includes('localhost') || referer.includes('hxfund.cn'));
+  const isHxfundDomain = origin && /^https?:\/\/([\w-]+\.)*hxfund\.cn(:\d+)?$/.test(origin);
+  const isMy3wDomain = origin && /^https?:\/\/([\w-]+\.)*my3w\.com(:\d+)?$/.test(origin);
+  const isApiHxfundDomain = origin === 'https://api.hxfund.cn';
+  const isRefererValid = referer && (referer.includes('localhost') || referer.includes('hxfund.cn') || referer.includes('api.hxfund.cn'));
 
   // 允许不带 origin 的请求（同源请求）
-  const isAllowed = !origin || isExactMatch || isSubdomainMatch || isRefererValid;
+  const isAllowed = !origin || isExactMatch || isHxfundDomain || isMy3wDomain || isApiHxfundDomain || isRefererValid;
 
   if (!isAllowed) {
     return res.status(403).json({
@@ -587,6 +644,30 @@ app.get('/api/models', (req, res) => {
 });
 
 /**
+ * POST /api/performance/metrics
+ * 接收前端性能指标（Web Vitals）
+ */
+app.post('/api/performance/metrics', (req, res) => {
+  // 注意：由于使用 sendBeacon，可能无法获取到完整的响应
+  try {
+    // 这里可以将性能指标存储到数据库或转发到分析服务
+    // 为了性能考虑，这里只做基本的日志记录
+    
+    // 注意：sendBeacon 请求通常没有标准的 Content-Type
+    // 所以我们不强制要求认证
+    
+    // 如果需要，可以在这里添加数据验证和过滤逻辑
+    console.log('[Performance Metrics] 收到性能指标:', req.body?.metric?.name, req.body?.metric?.value);
+    
+    // 简单响应，sendBeacon 不关心响应内容
+    res.status(204).end();
+  } catch (error) {
+    console.error('[Performance Metrics] 处理性能指标失败:', error);
+    res.status(204).end(); // 即使出错也要返回成功状态
+  }
+});
+
+/**
  * POST /api/models/switch
  * 切换默认模型（需要管理员权限）
  */
@@ -655,6 +736,24 @@ app.get('/api/health', async (req, res) => {
       sessionsCount,
       port: PORT
     }
+  });
+});
+
+// Sentry 错误处理中间件（放在所有路由之后）
+try {
+  const Sentry = require('@sentry/node');
+  app.use(Sentry.Handlers.errorHandler());
+} catch (error) {
+  console.warn('⚠️  Sentry 未配置，跳过错误处理中间件:', error.message);
+}
+
+// 全局错误处理
+app.use((err, req, res, next) => {
+  console.error('全局错误:', err);
+  res.status(500).json({
+    success: false,
+    error: '服务器内部错误',
+    code: 'INTERNAL_ERROR'
   });
 });
 

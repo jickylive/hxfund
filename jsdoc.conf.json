@@ -1,0 +1,44 @@
+{
+  "tags": {
+    "allowUnknownTags": true,
+    "dictionaries": ["jsdoc", "closure"]
+  },
+  "source": {
+    "include": ["server/", "public/js/", "scripts/"],
+    "includePattern": ".+\\.js(doc|x)?$",
+    "excludePattern": "(node_modules/|docs)"
+  },
+  "plugins": [
+    "plugins/markdown"
+  ],
+  "templates": {
+    "cleverLinks": true,
+    "monospaceLinks": true,
+    "dateFormat": "ddd MMM Do YYYY",
+    "outputSourceFiles": true,
+    "outputSourcePath": true,
+    "systemName": "黄氏家族寻根平台",
+    "footer": "",
+    "copyright": "Copyright © 2024 黄氏家族寻根平台项目",
+    "navType": "vertical",
+    "theme": "spacelab",
+    "linenums": true,
+    "inverseNav": true,
+    "highlightTutorialCode": true,
+    "default": {
+      "outputSourceFiles": true
+    }
+  },
+  "markdown": {
+    "parser": "gfm",
+    "hardwrap": true,
+    "tags": ["examples"]
+  },
+  "opts": {
+    "destination": "./docs/generated-docs/",
+    "encoding": "utf8",
+    "private": true,
+    "recurse": true,
+    "template": "./node_modules/minami"
+  }
+}

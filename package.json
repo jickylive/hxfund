@@ -1,37 +1,45 @@
 {
   "name": "huangshi-genealogy-qwen",
-  "version": "1.0.0",
-  "description": "黄氏家族寻根平台 - Qwen AI客户端",
+  "version": "3.3.0",
+  "description": "黄氏家族寻根平台 - 数字化传承黄氏家族文化，连接全球宗亲",
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
     "dev": "nodemon server/index.js",
-    "serve": "npx http-server public -p 8080",
     "build": "node scripts/build.js",
-    "build:prod": "node scripts/build.js && echo '构建完成，准备部署'",
-    "deploy:frontend": "echo '使用 GitHub Actions 部署前端'",
-    "deploy:backend": "echo '使用 GitHub Actions 部署后端'",
+    "docker:build": "docker build -t huangshi/api .",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:deploy": "npm run docker:build && npm run docker:up",
+    "deploy:docker": "bash scripts/deploy-docker.sh",
     "qwen": "node qwen-code.js",
-    "qwen:git": "node qwen-code-git.js",
-    "qwen:i": "node qwen-code.js -i",
     "qwen:init": "node qwen-code.js --init",
-    "qwen:git-analyze": "node qwen-code-git.js --git-analyze",
     "test": "node tests/test-api.js && node tests/test-auth.js && node tests/test-chat.js",
-    "test:ci": "npm test -- --ci"
+    "lint": "eslint . --ext .js",
+    "clean": "rm -rf node_modules package-lock.json && npm install"
   },
   "bin": {
     "qwen-code": "./scripts/qwen-code.bat"
   },
   "dependencies": {
+    "@sentry/node": "^10.42.0",
+    "@sentry/tracing": "^7.120.4",
     "body-parser": "^1.20.2",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
+    "csurf": "^1.11.0",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^7.5.1",
+    "express-session": "^1.19.0",
+    "express-validator": "^7.3.1",
+    "helmet": "^7.2.0",
     "redis": "^4.6.10",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "web-vitals": "^5.1.0"
   },
   "devDependencies": {
-    "js-yaml": "^4.1.1",
+    "eslint": "^8.57.1",
     "nodemon": "^3.0.1",
     "terser": "^5.46.0"
   },
@@ -39,8 +47,30 @@
     "genealogy",
     "qwen",
     "ai",
-    "family-tree"
+    "family-tree",
+    "huangshi",
+    "chinese-culture",
+    "pwa",
+    "blockchain",
+    "waline"
   ],
   "author": "Huangshi Genealogy Project",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/huangshi-genealogy/hxfund.cn.git"
+  },
+  "bugs": {
+    "url": "https://github.com/huangshi-genealogy/hxfund.cn/issues"
+  },
+  "homepage": "https://hxfund.cn",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
 }

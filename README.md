@@ -4,10 +4,11 @@
 
 ![License: MIT](https://img.shields.io/badge/Code-MIT-green.svg)
 ![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/Content-CC%20BY--NC--SA%204.0-lightgrey.svg)
-![Version](https://img.shields.io/badge/version-v3.2.0-orange.svg)
-![Platform](https://img.shields.io/badge/platform-Web%20SPA-blue.svg)
-![Lang](https://img.shields.io/badge/lang-HTML%20%7C%20CSS%20%7C%20JS-yellow.svg)
+![Version](https://img.shields.io/badge/version-v3.3.0-orange.svg)
+![Platform](https://img.shields.io/badge/platform-Web%20SPA%20%7C%20Node.js%20%7C%20Docker-blue.svg)
+![Lang](https://img.shields.io/badge/lang-HTML%20%7C%20CSS%20%7C%20JS%20%7C%20Node.js-yellow.svg)
 ![PWA](https://img.shields.io/badge/PWA-Supported-brightgreen.svg)
+![Docker](https://img.shields.io/badge/Docker-Supported-blueviolet.svg)
 
 **数字化族谱 · 区块链存证 · 宗亲连接 · 文化传承**
 
@@ -47,17 +48,20 @@
 
 ---
 
-## 🆕 v3.2.0 新增特性
+## 🆕 v3.3.0 新增特性
 
 ### 安全加固
 - 🔒 CORS 白名单配置，防止未授权跨域访问
 - 🔐 修复同源认证绕过问题，消除 CSRF 风险
 - 🛡️ 敏感配置文件自动加入 .gitignore
+- 🛡️ **新增安全中间件**：Helmet.js、速率限制、输入验证
+- 🛡️ **增强认证系统**：JWT令牌、API密钥、CSRF保护
 
 ### PWA 支持
 - 📱 添加到主屏幕，离线访问
 - 📲 快捷方式：族谱、字辈、AI 助手
 - 📶 离线页面提示
+- 🔄 **新增Service Worker**：智能缓存策略、版本控制
 
 ### 博客集成
 - 📝 **新增博客模块**：基于 Hexo 的文化传承平台
@@ -68,6 +72,19 @@
 - ⚡ 图片懒加载，减少首屏加载时间
 - 🗄️ Redis 会话存储，支持多实例部署
 - 🛡️ 前端全局错误处理，95% 错误捕获率
+- 📉 **新增Web Vitals监控**：性能指标采集与上报
+- 📦 **代码压缩优化**：JS/CSS压缩率提升至50%+
+
+### 部署增强
+- 🐳 **Docker容器化**：完整的Docker Compose部署方案
+- 🌐 **Nginx反向代理**：SSL终止、负载均衡、健康检查
+- 🔄 **自动化部署脚本**：一键部署前后端服务
+- 🔐 **SSL证书管理**：通配符证书支持所有子域名
+
+### AI功能增强
+- 🤖 **多模型支持**：qwen3.5-plus, qwen3-max, glm-5, kimi-k2.5等
+- 🧠 **智能对话**：上下文记忆、多轮对话支持
+- ⚡ **API优化**：流式响应、速率限制、错误重试
 
 ---
 
