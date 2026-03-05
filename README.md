@@ -9,9 +9,9 @@
 ![Lang](https://img.shields.io/badge/lang-HTML%20%7C%20CSS%20%7C%20JS-yellow.svg)
 ![PWA](https://img.shields.io/badge/PWA-Supported-brightgreen.svg)
 
-**数字化族谱 · 区块链存证 · 宗亲连接**
+**数字化族谱 · 区块链存证 · 宗亲连接 · 文化传承**
 
-[🌐 在线访问](https://hxfund.cn) · [📄 项目白皮书](whitepaper.html) · [🐛 提交问题](https://github.com/your-org/huangshi-genealogy/issues) · [📋 优化报告](OPTIMIZATION_REPORT.md)
+[🌐 在线访问](https://hxfund.cn) · [📚 博客](https://hxfund.cn/blog/) · [📄 项目白皮书](whitepaper.html) · [🐛 提交问题](https://github.com/your-org/huangshi-genealogy/issues) · [📋 优化报告](OPTIMIZATION_REPORT.md)
 
 </div>
 
@@ -27,6 +27,7 @@
 - ⛓️ 区块链哈希存证，数据不可篡改
 - ✉️ 宗亲留言墙，跨地域连接宗亲
 - 🗄️ 族谱数据库 ERD 可视化
+- 📝 **新增：文化博客**，记录和传承黄氏宗族历史文化
 
 > 黄姓为中国第七大姓，有约 4600 年历史，始祖伯益，分布于 28 个省市及东南亚、北美等地。
 
@@ -42,6 +43,7 @@
 | ⛓️ **区块链存证核验** | 模拟四步存证流程，支持在线哈希核验 |
 | 🗄️ **数据库 ERD** | 5 张核心数据表可视化，标注 PK/FK 关系 |
 | ✉️ **宗亲留言墙** | LocalStorage 持久化，300 字限制，倒序展示 |
+| 📝 **文化博客** | 记录黄氏宗族历史文化，分享寻根经验 |
 
 ---
 
@@ -56,6 +58,11 @@
 - 📱 添加到主屏幕，离线访问
 - 📲 快捷方式：族谱、字辈、AI 助手
 - 📶 离线页面提示
+
+### 博客集成
+- 📝 **新增博客模块**：基于 Hexo 的文化传承平台
+- 🌐 **统一部署**：主站与博客共享域名结构
+- 🔄 **自动化构建**：CI/CD 流程集成博客生成
 
 ### 性能优化
 - ⚡ 图片懒加载，减少首屏加载时间
@@ -74,6 +81,9 @@
 # 克隆仓库
 git clone https://github.com/your-org/huangshi-genealogy.git
 cd huangshi-genealogy
+
+# 初始化子模块（包含博客）
+git submodule update --init --recursive
 
 # 直接用浏览器打开（推荐 Chrome / Edge / Firefox）
 # Windows
@@ -103,12 +113,21 @@ npx serve .
 ## 📁 项目结构
 
 ```
-huangshi-genealogy/
+hxfund/
 ├── index.html          # 主页面（SPA 入口）
-├── style.css           # 全局样式（古风主题 + 响应式）
-├── script.js           # 核心 JavaScript逻辑
-├── whitepaper.html     # 项目白皮书（独立页面）
-├── LICENSE             # MIT 开源协议（代码部分）
+├── public/             # 主站静态资源
+├── blog/               # Hexo 博客模块 (子模块)
+│   ├── source/        # 博客内容
+│   ├── themes/        # 博客主题
+│   ├── public/        # 生成的静态文件
+│   └── _config.yml    # 博客配置
+├── server/             # 后端 API 服务
+├── scripts/            # 部署脚本
+│   ├── deploy-full.sh      # 全量部署脚本
+│   ├── deploy-blog.sh      # 博客部署脚本
+│   └── build-blog-content.sh # 博客内容构建脚本
+├── deploy/             # 部署配置
+├── docs/               # 项目文档
 └── README.md           # 本文件
 ```
 
@@ -119,6 +138,7 @@ huangshi-genealogy/
 | 层级 | 技术 |
 |------|------|
 | **前端** | HTML5 · CSS3 (Flexbox/Grid) · Vanilla JavaScript ES6 |
+| **博客** | Hexo 8.1.1 · Node.js · Markdown |
 | **数据持久化** | `localStorage`（客户端留言存储） |
 | **字体** | Google Fonts - Noto Serif SC |
 | **设计风格** | 古典中国风 · 深褐色调 · 宣纸米白 · 金色点缀 |
@@ -129,35 +149,75 @@ huangshi-genealogy/
 
 ---
 
-## 🎨 设计规范
+## 📝 博客管理
 
-```css
-/* 主色调 */
---primary:    #8B4513   /* 棕色（主色） */
---gold:       #C8933A   /* 金色（强调色） */
---bg:         #f5f3e8   /* 宣纸米白（背景） */
---bg-dark:    #2d1a0e   /* 深木色（页脚/封面） */
+### 添加新文章
+```bash
+# 进入博客目录
+cd blog
+
+# 创建新文章
+npx hexo new post "文章标题"
+
+# 编辑生成的文章
+# 文件位置: source/_posts/文章标题.md
 ```
 
-字体：**Noto Serif SC**（思源宋体），古籍风格首选。
+### 本地预览博客
+```bash
+cd blog
+npm run server
+# 访问 http://localhost:4000/blog/ 预览
+```
+
+### 构建博客内容
+```bash
+# 构建博客内容
+./scripts/build-blog-content.sh
+
+# 部署整个项目（包括博客）
+./scripts/deploy-full.sh
+```
 
 ---
 
 ## 📡 部署指南
 
-### GitHub Pages
+### GitHub Actions 自动部署
+
+本项目支持 GitHub Actions 自动部署，包含以下工作流：
+- `deploy-main-blog.yml`: 统一部署主站和博客
+- `deploy-frontend.yml`: 仅部署前端
+- `deploy-backend.yml`: 仅部署后端
+
+### 构建整个项目的前端
 
 ```bash
-# 推送到 main 分支后，在仓库 Settings > Pages 中
-# Source 选择 "Deploy from a branch"，选 main / root
-# 访问 https://your-org.github.io/huangshi-genealogy
+# 构建整个项目的前端（包括主站和博客）
+# 1. 初始化子模块
+git submodule update --init --recursive
+
+# 2. 构建主站前端
+npm run build
+
+# 3. 构建博客内容
+./scripts/build-blog-content.sh
+
+# 4. 部署整个项目（包括前端和博客）
+./scripts/deploy-full.sh <FTP_HOST> <FTP_USER> <FTP_PASS> [FTP_PORT]
 ```
 
-### Vercel（推荐，自动 HTTPS）
+### 手动部署
 
 ```bash
-npm i -g vercel
-vercel --prod
+# 部署整个项目（前端 + 博客）
+./scripts/deploy-full.sh <FTP_HOST> <FTP_USER> <FTP_PASS> [FTP_PORT]
+
+# 仅部署博客
+./scripts/deploy-blog.sh <FTP_HOST> <FTP_USER> <FTP_PASS> [FTP_PORT]
+
+# 仅构建博客内容
+./scripts/build-blog-content.sh
 ```
 
 ### 阿里云 OSS 静态托管
@@ -171,6 +231,7 @@ ossutil cp -r ./ oss://your-bucket/ --include "*.html" --include "*.css" --inclu
 ## 🗺️ 发展路线图
 
 - [x] **Phase 1（2024 Q1-Q3）**：静态 SPA 全功能上线，四大分支字辈库
+- [x] **Phase 1.5（2024 Q4）**：博客模块集成，文化传承平台
 - [ ] **Phase 2（2024 Q4-2025 Q2）**：后端 API + 区块链深度集成 + 用户认证
 - [ ] **Phase 3（2025 Q3-2026）**：AI 智能寻亲 + 多语言 + 移动端 APP
 - [ ] **Phase 4（2026+）**：全球化生态，横向扩展至其他大姓
@@ -188,18 +249,22 @@ ossutil cp -r ./ oss://your-bucket/ --include "*.html" --include "*.css" --inclu
 # 2. 创建功能分支
 git checkout -b feature/add-branch-data
 
-# 3. 提交更改
+# 3. 初始化子模块（如果包含博客更新）
+git submodule update --init --recursive
+
+# 4. 提交更改
 git commit -m "feat: 新增XX支系字辈数据"
 
-# 4. 推送分支
+# 5. 推送分支
 git push origin feature/add-branch-data
 
-# 5. 创建 Pull Request
+# 6. 创建 Pull Request
 ```
 
 ### 贡献方向
 
 - 📝 **数据贡献**：补充各地黄氏支系字辈诗、始祖信息
+- 📚 **博客内容**：撰写黄氏历史文化、寻根经验文章
 - 🐛 **Bug 修复**：提交 [Issue](https://github.com/your-org/huangshi-genealogy/issues) 或直接 PR
 - 🌐 **国际化**：翻译界面为英文、马来文、越南文等
 - 🎨 **UI 优化**：改进视觉设计与动效体验
@@ -227,6 +292,7 @@ CC BY-NC-SA 4.0 — 内容可转载，须注明出处，不得商业使用，衍
 ## 📮 联系我们
 
 - 🌐 官网：[hxfund.cn](https://hxfund.cn)
+- 📚 博客：[hxfund.cn/blog/](https://hxfund.cn/blog/)
 - 📧 邮箱：contact@hxfund.cn
 - 💬 Issues：[GitHub Issues](https://github.com/your-org/huangshi-genealogy/issues)
 
