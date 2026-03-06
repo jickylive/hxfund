@@ -1,28 +1,57 @@
 version: '3.8'
 
 services:
-  # 后端 API 服务
+  # Redis 缓存（内部服务）
+  redis:
+    image: docker.m.daocloud.io/redis:7-alpine
+    container_name: huangshi-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+  # 后端 API 服务（内部服务）
   api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: huangshi-api
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    # 不暴露端口到主机，仅在内部网络中可用
+    expose:
+      - "3000"
+    env_file:
+      - .env
     environment:
-      - NODE_ENV=production
+      # 确保环境变量传递给容器
+      - NODE_ENV=${NODE_ENV:-production}
       - PORT=3000
-      - ALLOWED_ORIGINS=https://hxfund.cn,https://www.hxfund.cn,https://huangshi.hxfund.cn
-      # Redis 配置（可选）
       - REDIS_URL=redis://redis:6379
+      - QWEN_API_KEY=${QWEN_API_KEY:-}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+      - QWEN_MODEL=${QWEN_MODEL:-qwen3.5-plus}
+      - QWEN_BASE_URL=${QWEN_BASE_URL:-https://coding.dashscope.aliyuncs.com/v1}
+      - QWEN_TEMPERATURE=${QWEN_TEMPERATURE:-0.7}
     volumes:
       # 挂载日志目录
       - ./logs:/app/logs
       # 挂载配置目录（敏感信息）
       - ./server/config:/app/server/config:ro
     networks:
-      - huangshi-network
+      - internal
     depends_on:
       - redis
     healthcheck:
@@ -35,32 +64,15 @@ services:
       resources:
         limits:
           memory: 256M
-
-  # Redis 缓存（可选）
-  redis:
-    image: redis:latest
-    container_name: huangshi-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - redis-data:/data
-    networks:
-      - huangshi-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    deploy:
-      resources:
-        limits:
+        reservations:
           memory: 128M
 
-  # API 反向代理 (HTTPS)
+  # API 反向代理 (HTTPS) - 唯一对外暴露的服务
   api-proxy:
-    image: nginx:alpine
+    image: docker.m.daocloud.io/nginx:1.25-alpine
     container_name: huangshi-api-proxy
     restart: unless-stopped
+    # 仅暴露80和443端口供外部访问
     ports:
       - "80:80"
       - "443:443"
@@ -69,11 +81,11 @@ services:
       - ./server/config/cert.pem:/etc/nginx/ssl/ssl_certificate.crt:ro
       - ./server/config/private.pem:/etc/nginx/ssl/ssl_private.key:ro
     networks:
-      - huangshi-network
+      - internal
     depends_on:
       - api
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/nginx_status"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/nginx_status"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -82,10 +94,21 @@ services:
       resources:
         limits:
           memory: 32M
+        reservations:
+          memory: 16M
 
+# 定义网络
 networks:
-  huangshi-network:
+  # 内部网络，用于服务间通信
+  internal:
     driver: bridge
+    # 启用内部网络加密（可选）
+    enable_ipv6: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
 
 volumes:
   redis-data:
+    driver: local

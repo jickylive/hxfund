@@ -82,15 +82,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            // 确定API基础URL
+            const apiBaseUrl = window.API_CONFIG?.baseURL || 
+                              (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
+            
             // 从服务器代理端点获取新 Token（不暴露 API Key）
-            const response = await fetch('/api/auth/client-token', {
+            const response = await fetch(`${apiBaseUrl}/api/auth/client-token`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'same-origin' // 仅允许同源请求
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Cache-Control': 'no-cache'
+                },
+                credentials: 'include' // 包含cookies和其他认证信息
             });
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
+                // 尝试解析错误响应
+                let errorData = {};
+                try {
+                    errorData = await response.json();
+                } catch (parseError) {
+                    // 如果响应不是JSON，使用状态文本
+                    errorData = { error: response.statusText, status: response.status };
+                }
+                
                 throw new Error(`获取 Token 失败：${errorData.error || response.status}`);
             }
 
@@ -118,9 +133,17 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('获取认证 Token 失败:', error.message);
             
-            // 显示友好的错误提示给用户
-            addMessage('ai', `⚠️ 网络连接问题：${error.message}<br>请检查网络连接或稍后重试。`);
-            
+            // 区分不同类型的错误
+            if (error.message.includes('404') || error.message.includes('not found')) {
+                addMessage('ai', `⚠️ 网络连接问题：API 端点不存在<br>请检查网络连接或联系管理员。`);
+            } else if (error.message.includes('403') || error.message.includes('forbidden')) {
+                addMessage('ai', `⚠️ 认证错误：访问被拒绝<br>请联系管理员检查权限。`);
+            } else if (error.message.includes('网络') || error.message.includes('Network')) {
+                addMessage('ai', `⚠️ 网络连接问题：${error.message}<br>请检查网络连接或稍后重试。`);
+            } else {
+                addMessage('ai', `⚠️ 网络连接问题：${error.message}<br>请检查网络连接或稍后重试。`);
+            }
+
             // 网络错误等情况下返回 null
             return null;
         }
@@ -129,7 +152,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // 加载模型列表
     async function loadModels() {
         try {
-            const res = await fetch('/api/models');
+            // 确定API基础URL
+            const apiBaseUrl = window.API_CONFIG?.baseURL || 
+                              (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
+            
+            const res = await fetch(`${apiBaseUrl}/api/models`, {
+                headers: {
+                    'Cache-Control': 'no-cache'
+                }
+            });
+            
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            
             const data = await res.json();
             if (data.success) {
                 const currentModel = qwenModelSelect.value;
@@ -148,7 +184,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('加载模型列表失败:', error.message);
-            addMessage('ai', `⚠️ 网络错误：${error.message}<br>无法加载模型列表，请检查网络连接。`);
+            
+            // 检查错误类型并提供更准确的错误信息
+            if (error.message.includes('404')) {
+                addMessage('ai', `⚠️ 网络错误：API 端点不存在<br>无法加载模型列表，请检查网络连接或联系管理员。`);
+            } else if (error.message.includes('Unexpected token <')) {
+                addMessage('ai', `⚠️ 网络错误：收到非JSON响应<br>无法加载模型列表，请检查网络连接。`);
+            } else {
+                addMessage('ai', `⚠️ 网络错误：${error.message}<br>无法加载模型列表，请检查网络连接。`);
+            }
         }
     }
 
@@ -194,14 +238,21 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error('无法获取认证令牌，请检查网络连接或联系管理员');
         }
 
+        // 确定API基础URL
+        const apiBaseUrl = window.API_CONFIG?.baseURL || 
+                          (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
+
         // 构建请求头
-        const headers = { 'Content-Type': 'application/json' };
+        const headers = { 
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
+        };
         if (token) {
             headers['Authorization'] = 'Bearer ' + token;
         }
 
         try {
-            const response = await fetch('/api/conversation', {
+            const response = await fetch(`${apiBaseUrl}/api/conversation`, {
                 method: 'POST',
                 headers: headers,
                 body: JSON.stringify({
@@ -224,11 +275,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (newToken) {
                         // 重试请求
-                        const retryResponse = await fetch('/api/conversation', {
+                        const retryResponse = await fetch(`${apiBaseUrl}/api/conversation`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + newToken
+                                'Authorization': 'Bearer ' + newToken,
+                                'Cache-Control': 'no-cache'
                             },
                             body: JSON.stringify({
                                 message,

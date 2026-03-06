@@ -12,14 +12,14 @@
          SEO & PWA 配置
     ============================================= -->
     <link rel="canonical" href="https://hxfund.cn/">
-    <link rel="manifest" href="/pwa/manifest.json">
+    <link rel="manifest" href="./pwa/manifest.json">
     <meta name="theme-color" content="#8B4513">
 
     <!-- Apple 设备配置 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="黄氏寻根">
-    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" href="./assets/images/icon-192.png">
 
     <!-- ============================================
          API 配置（部署时修改为实际地址）
@@ -28,8 +28,8 @@
         // 生产环境：https://api.hxfund.cn
         // 开发环境：http://localhost:3000
         window.API_CONFIG = {
-            baseURL: window.location.hostname === 'localhost' 
-                ? 'http://localhost:3000' 
+            baseURL: window.location.hostname === 'localhost'
+                ? 'http://localhost:3000'
                 : 'https://api.hxfund.cn',
             timeout: 30000
         };
@@ -48,8 +48,8 @@
     </style>
 
     <!-- 非关键 CSS 异步加载 -->
-    <link rel="preload" href="/css/style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/style.css"></noscript>
+    <link rel="preload" href="./css/style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="./css/style.css"></noscript>
 </head>
 
 <body>
@@ -473,14 +473,14 @@
     <button id="backToTop" class="back-to-top" aria-label="回到顶部">↑</button>
 
     <!-- ============================================
-         脚本文件：defer 异步加载，数据优先
+         脚本文件：模块化加载
     ============================================= -->
-    <script src="/js/error-monitor.js" defer></script>
-    <script src="/js/data.js" defer></script>
-    <script src="/js/main.js" defer></script>
-    <script src="/js/modules.js" defer></script>
-    <script src="/js/script.js" defer></script>
-    <!-- Web Vitals 监控 -->
-    <script src="/js/web-vitals.js" defer></script>
+    <script type="module" src="./js/main.js"></script>
+    <script type="module" src="./js/components/qwen-ai.js"></script>
+    <script type="module" src="./js/components/family-tree.js"></script>
+    <script type="module" src="./js/components/generation-calculator.js"></script>
+    <script type="module" src="./js/components/blockchain-verifier.js"></script>
+    <script type="module" src="./js/utils/error-monitor.js"></script>
+    <script type="module" src="./js/utils/web-vitals.js"></script>
 </body>
 </html>

@@ -88,7 +88,7 @@ else
             # 替换配置中的占位符
             sed -i "s|\${FTP_HOST}|$FTP_HOST|g" blog/_config.deploy.yml
             sed -i "s|\${FTP_USER}|$FTP_USER|g" blog/_config.deploy.yml
-            sed -i "s|\${FTP_PASSWORD}|$FTP_PASS|g" blog/_config.deploy.yml
+            sed -i "s|\${FTP_PASS}|$FTP_PASS|g" blog/_config.deploy.yml
             sed -i "s|\${FTP_PORT}|$FTP_PORT|g" blog/_config.deploy.yml
             sed -i "s|\${FTP_REMOTE}|$FTP_REMOTE|g" blog/_config.deploy.yml
             

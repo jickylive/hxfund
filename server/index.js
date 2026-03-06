@@ -14,7 +14,7 @@
  */
 
 // 初始化 Sentry 错误监控（首先加载）
-const { initSentry, setupGlobalHandlers } = require('./sentry');
+const { initSentry, setupGlobalHandlers, setupExpressIntegration } = require('./sentry');
 initSentry();
 setupGlobalHandlers();
 
@@ -50,6 +50,9 @@ const walineRouter = require('./waline');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// 设置 Sentry Express 集成（在其他中间件之前）
+setupExpressIntegration(app);
 
 // ============================================
 // 安全中间件
@@ -90,13 +93,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Sentry 请求追踪中间件（在其他中间件之前）
-try {
-  const Sentry = require('@sentry/node');
-  app.use(Sentry.Handlers.requestHandler());
-  app.use(Sentry.Handlers.tracingHandler());
-} catch (error) {
-  console.warn('⚠️  Sentry 未配置，跳过请求追踪中间件:', error.message);
-}
+// 已通过 setupExpressIntegration 在 app 初始化时添加
 
 // 初始化认证配置
 initAuthConfig();
@@ -143,13 +140,13 @@ app.use((req, res, next) => {
   next();
 });
 
-// 提供静态文件（public 目录）
-app.use(express.static(path.join(__dirname, '..', 'public')));
-
 // 根路径路由 - 返回主页
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
+
+// 提供静态文件（public 目录）- 放在所有特定路由之后
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // ============================================
 // Waline 评论系统 API
@@ -740,12 +737,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // Sentry 错误处理中间件（放在所有路由之后）
-try {
-  const Sentry = require('@sentry/node');
-  app.use(Sentry.Handlers.errorHandler());
-} catch (error) {
-  console.warn('⚠️  Sentry 未配置，跳过错误处理中间件:', error.message);
-}
+// 已通过 setupExpressIntegration 在 app 初始化时添加
 
 // 全局错误处理
 app.use((err, req, res, next) => {

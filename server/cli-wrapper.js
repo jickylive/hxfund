@@ -1,6 +1,6 @@
 /**
  * 黄氏家族寻根平台 - Qwen CLI 封装模块
- * 
+ *
  * 统一调用 qwen-code.js CLI 工具
  * 所有 AI 请求都通过 CLI 工具转发
  */
@@ -17,6 +17,17 @@ const CONFIG_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.qwe
  */
 function loadCliConfig() {
   try {
+    // 优先从环境变量读取配置
+    if (process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY) {
+      return {
+        apiKey: process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY,
+        baseURL: process.env.QWEN_BASE_URL || process.env.DASHSCOPE_BASE_URL || 'https://coding.dashscope.aliyuncs.com/v1',
+        model: process.env.QWEN_MODEL || 'qwen3.5-plus',
+        temperature: parseFloat(process.env.QWEN_TEMPERATURE) || 0.7
+      };
+    }
+    
+    // 否则从配置文件读取
     if (fs.existsSync(CONFIG_FILE)) {
       return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
     }
@@ -51,11 +62,23 @@ async function callQwenCli(prompt, options = {}) {
   // prompt 放在最后，不需要额外引号（spawn 会处理）
   args.push(prompt);
 
+  // 创建包含API密钥的环境变量
+  const env = {
+    ...process.env,
+    ...(process.env.QWEN_API_KEY ? { QWEN_API_KEY: process.env.QWEN_API_KEY } : {}),
+    ...(process.env.DASHSCOPE_API_KEY ? { DASHSCOPE_API_KEY: process.env.DASHSCOPE_API_KEY } : {}),
+    ...(process.env.QWEN_BASE_URL ? { QWEN_BASE_URL: process.env.QWEN_BASE_URL } : {}),
+    ...(process.env.DASHSCOPE_BASE_URL ? { DASHSCOPE_BASE_URL: process.env.DASHSCOPE_BASE_URL } : {}),
+    ...(process.env.QWEN_MODEL ? { QWEN_MODEL: process.env.QWEN_MODEL } : {}),
+    ...(process.env.QWEN_TEMPERATURE ? { QWEN_TEMPERATURE: process.env.QWEN_TEMPERATURE } : {})
+  };
+
   return new Promise((resolve, reject) => {
     const process = spawn('node', args, {
       encoding: 'utf-8',
       timeout: 60000, // 60 秒超时
-      cwd: path.join(__dirname, '..') // 在项目根目录执行
+      cwd: path.join(__dirname, '..'), // 在项目根目录执行
+      env: env // 使用包含API密钥的环境变量
     });
 
     let output = '';

@@ -28,6 +28,7 @@ RUN npm ci --only=production && \
 
 # 复制应用代码
 COPY server/ ./server/
+COPY qwen-code.js ./qwen-code.js
 
 # 设置文件权限
 RUN chown -R nodejs:nodejs /app

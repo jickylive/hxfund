@@ -38,10 +38,10 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const QWEN_SETTINGS_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.qwen', 'settings.json');
 
 const DEFAULT_CONFIG = {
-  apiKey: '',
-  baseURL: 'https://coding.dashscope.aliyuncs.com/v1',
-  model: 'qwen3.5-plus',
-  temperature: 0.7,
+  apiKey: process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY || '',
+  baseURL: process.env.QWEN_BASE_URL || process.env.DASHSCOPE_BASE_URL || 'https://coding.dashscope.aliyuncs.com/v1',
+  model: process.env.QWEN_MODEL || 'qwen3.5-plus',
+  temperature: parseFloat(process.env.QWEN_TEMPERATURE || '0.7'),
   systemPrompt: '你是黄氏家族寻根助手，由通义千问提供技术支持。你专注于：\n1. 解答黄姓起源、历史和文化\n2. 帮助查询族谱和字辈信息\n3. 提供寻根问祖相关咨询\n4. 传承和弘扬黄氏家族传统美德\n\n作为编程助手，你也擅长解答代码相关问题。'
 };
 

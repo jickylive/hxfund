@@ -12,6 +12,10 @@
     "docker:down": "docker-compose down",
     "docker:deploy": "npm run docker:build && npm run docker:up",
     "deploy:docker": "bash scripts/deploy-docker.sh",
+    "deploy:aliyun": "node scripts/deploy-frontend-to-aliyun-oss.js",
+    "deploy:aliyun:sts": "node scripts/deploy-frontend-to-aliyun-oss-sts.js",
+    "deploy:aliyun:smart": "node scripts/deploy-frontend-to-aliyun-oss-smart.js",
+    "deploy:aliyun:ftp": "node scripts/deploy-frontend-to-aliyun-ftp.js",
     "qwen": "node qwen-code.js",
     "qwen:init": "node qwen-code.js --init",
     "test": "node tests/test-api.js && node tests/test-auth.js && node tests/test-chat.js",
@@ -39,8 +43,13 @@
     "web-vitals": "^5.1.0"
   },
   "devDependencies": {
+    "basic-ftp": "^5.2.0",
+    "canvas": "^3.2.1",
     "eslint": "^8.57.1",
+    "ftp": "^0.3.10",
     "nodemon": "^3.0.1",
+    "puppeteer": "^24.38.0",
+    "sharp": "^0.34.5",
     "terser": "^5.46.0"
   },
   "keywords": [
