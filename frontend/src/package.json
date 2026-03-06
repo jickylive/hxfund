@@ -1,0 +1,57 @@
+{
+  "name": "hxfund-frontend",
+  "version": "3.2.0",
+  "description": "黄氏家族寻根平台 - 前端重构版",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .js --fix",
+    "format": "prettier --write src/**/*.{js,css,html}",
+    "analyze": "vite build --mode analyze",
+    "serve": "http-server ./dist -o"
+  },
+  "keywords": [
+    "genealogy",
+    "qwen",
+    "ai",
+    "family-tree",
+    "huangshi",
+    "chinese-culture",
+    "pwa",
+    "blockchain",
+    "waline"
+  ],
+  "author": "Huangshi Genealogy Project",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "@vitejs/plugin-basic-ssl": "^1.0.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.0",
+    "terser": "^5.24.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.31",
+    "sass": "^1.69.5",
+    "http-server": "^14.1.1",
+    "rollup-plugin-visualizer": "^5.9.3"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ],
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/huangshi-genealogy/hxfund.cn.git"
+  },
+  "bugs": {
+    "url": "https://github.com/huangshi-genealogy/hxfund.cn/issues"
+  },
+  "homepage": "https://hxfund.cn"
+}

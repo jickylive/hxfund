@@ -7,11 +7,21 @@
  * 3. 使用 cssnano 压缩 CSS 文件
  * 4. 生成 CDN 优化版本的 HTML
  * 5. 生成资源清单
+ * 6. 备份会话数据（压缩格式）
  */
 
 const fs = require('fs');
 const path = require('path');
-const { minify } = require('terser');
+const zlib = require('zlib');
+
+// Dynamically require terser only when needed
+let terser = null;
+async function getTerser() {
+    if (!terser) {
+        terser = await import('terser');
+    }
+    return terser;
+}
 
 const SRC_DIR = path.join(__dirname, '..');
 const DIST_DIR = path.join(__dirname, '..', 'dist');
@@ -113,7 +123,8 @@ async function processJS() {
 
         // 使用 terser 生成压缩版本
         try {
-            const minified = await minify(js, {
+            const terserModule = await getTerser();
+            const minified = await terserModule.minify(js, {
                 compress: {
                     drop_console: false,
                     drop_debugger: false,
@@ -207,7 +218,7 @@ function generateHTML() {
 // 生成资源清单
 function generateManifest(stats) {
     console.log('\n📋 生成资源清单...');
-    
+
     const manifest = {
         version: '3.1.1',
         buildTime: new Date().toISOString(),
@@ -228,12 +239,63 @@ function generateManifest(stats) {
             js: (stats.js.reduce((sum, s) => sum + s.minified, 0) / stats.js.reduce((sum, s) => sum + s.original, 0) * 100).toFixed(1) + '%'
         }
     };
-    
+
     const dest = path.join(DIST_DIR, 'manifest.json');
     fs.writeFileSync(dest, JSON.stringify(manifest, null, 2), 'utf-8');
     console.log(`  ✓ manifest.json`);
-    
+
     return manifest;
+}
+
+// 备份会话数据（压缩格式）
+async function backupSessionData() {
+    console.log('\n💾 备份会话数据...');
+    
+    // 创建备份目录
+    const backupDir = path.join(DIST_DIR, 'backups');
+    ensureDir(backupDir);
+    
+    try {
+        // 检查是否有会话数据需要备份
+        const sessionStorePath = path.join(SRC_DIR, 'server', 'session-store.js');
+        if (!fs.existsSync(sessionStorePath)) {
+            console.log('  ℹ️  会话存储模块不存在，跳过备份');
+            return;
+        }
+        
+        // 读取当前会话数据（如果是内存存储的话）
+        // 在实际部署中，会话数据可能存储在 Redis 或其他地方
+        // 这里我们创建一个示例备份
+        
+        const sessionBackup = {
+            timestamp: new Date().toISOString(),
+            note: '会话数据备份 - 仅用于演示目的，实际会话数据可能存储在 Redis 或其他持久化存储中',
+            backupType: 'session-data-compression-backup'
+        };
+        
+        // 将备份数据转换为 JSON
+        const sessionData = JSON.stringify(sessionBackup, null, 2);
+        
+        // 压缩数据
+        const compressedData = zlib.gzipSync(sessionData);
+        
+        // 保存压缩的备份文件
+        const backupFileName = `sessions-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json.gz`;
+        const backupFilePath = path.join(backupDir, backupFileName);
+        
+        fs.writeFileSync(backupFilePath, compressedData);
+        
+        console.log(`  ✓ ${path.relative(DIST_DIR, backupFilePath)} (${(compressedData.length / 1024).toFixed(2)} KB)`);
+        
+        // 同时保存未压缩的备份作为参考
+        const uncompressedBackupPath = path.join(backupDir, backupFileName.replace('.gz', '.json'));
+        fs.writeFileSync(uncompressedBackupPath, sessionData);
+        
+        console.log(`  ✓ ${path.relative(DIST_DIR, uncompressedBackupPath)} (${(sessionData.length / 1024).toFixed(2)} KB)`);
+        
+    } catch (error) {
+        console.error(`  ✗ 会话数据备份失败: ${error.message}`);
+    }
 }
 
 // 主函数
@@ -241,7 +303,7 @@ async function build() {
     console.log('╔═══════════════════════════════════════════════════════════╗');
     console.log('║     黄氏家族寻根平台 - 静态资源构建                       ║');
     console.log('╚═══════════════════════════════════════════════════════════╝\n');
-    
+
     // 清理并创建目录
     console.log('📁 创建目录结构...');
     if (fs.existsSync(DIST_DIR)) {
@@ -255,7 +317,7 @@ async function build() {
     console.log('  ✓ dist/css/');
     console.log('  ✓ dist/js/');
     console.log('  ✓ dist/images/');
-    
+
     // 复制图片等静态资源
     console.log('\n📁 复制静态资源...');
     const imagesSrc = path.join(PUBLIC_DIR, 'images');
@@ -272,7 +334,7 @@ async function build() {
     } else {
         console.log('  ℹ️  pwa 目录不存在，跳过');
     }
-    
+
     // 处理 CSS
     const cssStats = processCSS();
 
@@ -281,10 +343,13 @@ async function build() {
 
     // 生成 HTML
     const htmlSize = generateHTML();
-    
+
     // 生成清单
     const manifest = generateManifest({ css: cssStats, js: jsStats });
-    
+
+    // 备份会话数据
+    await backupSessionData();
+
     // 输出摘要
     console.log('\n╔═══════════════════════════════════════════════════════════╗');
     console.log('║                    构建完成                               ║');

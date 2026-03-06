@@ -237,11 +237,146 @@ npm run build
 ./scripts/build-blog-content.sh
 ```
 
-### 阿里云 OSS 静态托管
+### 阿里云部署选项
+
+#### 方法 0: 智能部署 (推荐)
+
+这是一种智能的部署方式，它会自动检测运行环境：
+
+- 如果在配置了 RAM 角色的 ECS 实例上运行，则使用 STS 临时凭证
+- 如果在其他环境运行，则自动切换到传统 AccessKey 方式
 
 ```bash
-ossutil cp -r ./ oss://your-bucket/ --include "*.html" --include "*.css" --include "*.js"
+# 使用 .env 文件配置（推荐）
+cp .env.example .env
+nano .env  # 编辑文件，设置所有必要的环境变量
+
+# 运行智能部署
+npm run deploy:aliyun:smart
 ```
+
+#### 方法 1: 使用 ECS 实例角色和 STS 临时凭证 (在 ECS 上最高安全级别 - 推荐)
+
+这种方式最为安全，因为它使用临时凭证而非长期访问密钥：
+
+##### 使用 .env 文件配置（推荐）：
+```bash
+# 1. 配置 ECS 实例角色（在阿里云控制台完成）
+# 2. 复制并编辑环境变量文件
+cp .env.example .env
+nano .env  # 编辑文件，设置 ECS_ROLE_NAME 和 ALIYUN_OSS_* 变量
+
+# 3. 运行部署脚本
+node scripts/deploy-frontend-to-aliyun-oss-sts.js
+```
+
+##### 或使用环境变量直接设置：
+```bash
+# 1. 配置 ECS 实例角色（在阿里云控制台完成）
+# 2. 设置环境变量
+export ECS_ROLE_NAME="your-ecs-role-name"
+export ALIYUN_OSS_BUCKET_NAME="your-bucket-name"
+export ALIYUN_OSS_ENDPOINT="oss-cn-hangzhou.aliyuncs.com"  # 可选，默认为 oss-cn-hangzhou.aliyuncs.com
+
+# 3. 运行部署脚本
+node scripts/deploy-frontend-to-aliyun-oss-sts.js
+```
+
+#### 方法 2: 使用部署脚本 (标准安全级别)
+
+我们提供了自动化的部署脚本：
+
+##### 使用 .env 文件配置（推荐）：
+```bash
+# 复制并编辑环境变量文件
+cp .env.example .env
+nano .env  # 编辑文件，设置 ALIYUN_OSS_* 和 ALIYUN_ACCESS_* 变量
+
+# 交互式部署
+npm run deploy:aliyun
+
+# 或非交互式部署
+node scripts/deploy-frontend-to-aliyun-oss-non-interactive.js
+```
+
+##### 或使用环境变量直接设置：
+```bash
+# 交互式部署
+npm run deploy:aliyun
+
+# 或者使用环境变量进行非交互式部署
+export ALIYUN_OSS_BUCKET_NAME="your-bucket-name"
+export ALIYUN_ACCESS_KEY_ID="your-access-key-id"
+export ALIYUN_ACCESS_KEY_SECRET="your-access-key-secret"
+export ALIYUN_OSS_ENDPOINT="oss-cn-hangzhou.aliyuncs.com"  # 可选，默认为 oss-cn-hangzhou.aliyuncs.com
+node scripts/deploy-frontend-to-aliyun-oss-non-interactive.js
+```
+
+#### 方法 3: 手动部署
+
+使用阿里云 OSS 客户端工具：
+
+```bash
+# 安装 ossutil (如果尚未安装)
+wget http://gosspublic.alicdn.com/ossutil/install.sh
+sudo sh install.sh
+
+# 配置 ossutil
+ossutil config
+
+# 上传文件
+ossutil cp -r ./dist/ oss://your-bucket-name/ --include "*" --meta "Cache-Control:public, max-age=3600"
+```
+
+#### 方法 3: FTP 部署到阿里云虚拟主机
+
+将构建的前端文件直接部署到阿里云虚拟主机：
+
+##### 使用 .env 文件配置（推荐）：
+```bash
+# 复制并编辑环境变量文件
+cp .env.example .env
+nano .env  # 编辑文件，设置 ALIYUN_FTP_* 变量
+
+# 运行 FTP 部署
+npm run deploy:aliyun:ftp
+```
+
+##### 或使用环境变量直接设置：
+```bash
+export ALIYUN_FTP_HOST="your-aliyun-ftp-host.com"
+export ALIYUN_FTP_USER="your-ftp-username"
+export ALIYUN_FTP_PASS="your-ftp-password"
+export ALIYUN_FTP_REMOTE_DIR="/htdocs"
+
+npm run deploy:aliyun:ftp
+```
+
+#### FTP 部署配置说明
+在部署之前，请确保：
+1. 您拥有阿里云虚拟主机的 FTP 访问权限
+2. 已构建项目：`npm run build`
+3. 已安装 lftp 工具：`sudo apt-get install lftp` (Ubuntu/Debian) 或 `brew install lftp` (macOS)
+4. 从阿里云控制台获取正确的 FTP 服务器地址、用户名和密码
+
+更多信息请参阅 `docs/FTP_DEPLOYMENT_EXAMPLE.md`。
+
+#### 配置 CDN 加速 (推荐)
+
+为了获得更好的访问速度和更低的成本，建议配置阿里云 CDN：
+
+1. 在阿里云 CDN 控制台添加域名
+2. 将源站类型设置为 "OSS域名" 或 "IP/域名"（如果是虚拟主机）
+3. 选择对应的 Bucket 或虚拟主机作为主源站
+4. 配置备用源站为您的备用服务器
+5. 配置 CNAME 解析到 CDN 分配的域名
+6. (可选) 配置 HTTPS 证书
+
+更多详细信息请参阅：
+- `docs/ALIYUN_OSS_DEPLOYMENT_GUIDE.md` - OSS 部署指南
+- `docs/ALIYUN_FTP_DEPLOYMENT_GUIDE.md` - FTP 部署指南  
+- `docs/ALIYUN_CDN_OSS_BACKUP_SOURCE_CONFIG.md` - CDN 配置指南
+- `docs/DEPLOYMENT_OPTIONS_SUMMARY.md` - 部署选项摘要
 
 ---
 
