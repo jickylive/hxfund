@@ -1,0 +1,43 @@
+---
+# ============================================
+# Namespace - 黄氏家族寻根平台命名空间
+# ============================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hxfund
+  labels:
+    name: hxfund
+    app: huangshi-genealogy
+    environment: production
+---
+# 资源配额
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: hxfund-quota
+  namespace: hxfund
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    persistentvolumeclaims: "5"
+    services.loadbalancers: "1"
+---
+# 限制范围
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: hxfund-limits
+  namespace: hxfund
+spec:
+  limits:
+  - default:
+      memory: 512Mi
+      cpu: "500m"
+    defaultRequest:
+      memory: 256Mi
+      cpu: "250m"
+    type: Container

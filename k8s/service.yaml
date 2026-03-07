@@ -1,0 +1,67 @@
+---
+# ============================================
+# Service - API 服务
+# ============================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: hxfund-api
+  namespace: hxfund
+  labels:
+    app: huangshi-genealogy
+    component: api
+  annotations:
+    # 服务监控
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "3000"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: huangshi-genealogy
+    component: api
+  sessionAffinity: None
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: hxfund-redis
+  namespace: hxfund
+  labels:
+    app: redis
+    component: cache
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  selector:
+    app: redis
+---
+# NodePort Service (可选，用于外部访问)
+apiVersion: v1
+kind: Service
+metadata:
+  name: hxfund-api-nodeport
+  namespace: hxfund
+  labels:
+    app: huangshi-genealogy
+    component: api
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 3000
+    nodePort: 30080
+    protocol: TCP
+    name: http
+  selector:
+    app: huangshi-genealogy
+    component: api
