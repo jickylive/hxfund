@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qwen AI 组件测试页面</title>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 25px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 2.2rem;
+      margin-bottom: 10px;
+      background: linear-gradient(to right, #ffecd2, #fcb69f);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header p {
+      opacity: 0.9;
+      font-size: 1.1rem;
+    }
+
+    .main-content {
+      padding: 30px;
+      display: grid;
+      grid-template-columns: 1fr 350px;
+      gap: 30px;
+    }
+
+    @media (max-width: 768px) {
+      .main-content {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chat-section {
+      display: flex;
+      flex-direction: column;
+      height: 600px;
+    }
+
+    .chat-header {
+      padding: 15px 20px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #495057;
+    }
+
+    .chat-stats {
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+
+    .messages-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: #fdfdfd;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .message {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 12px;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 18px;
+    }
+
+    .user-avatar {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .ai-avatar {
+      background: linear-gradient(135deg, #ffa751 0%, #ffe259 100%);
+      color: white;
+    }
+
+    .message-content {
+      flex: 1;
+    }
+
+    .message-name {
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-size: 0.95rem;
+    }
+
+    .user-name {
+      color: #495057;
+    }
+
+    .ai-name {
+      color: #6f42c1;
+    }
+
+    .message-text {
+      background: white;
+      padding: 12px 16px;
+      border-radius: 18px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      line-height: 1.6;
+    }
+
+    .user-message .message-text {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-bottom-right-radius: 5px;
+    }
+
+    .ai-message .message-text {
+      background: #f8f9fa;
+      color: #495057;
+      border-bottom-left-radius: 5px;
+    }
+
+    .typing-indicator {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px 20px;
+      color: #6c757d;
+    }
+
+    .typing-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      background: #6c757d;
+      border-radius: 50%;
+      animation: bounce 1.5s infinite ease-in-out;
+    }
+
+    .typing-dot:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-dot:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-5px); }
+    }
+
+    .input-area {
+      padding: 20px;
+      background: white;
+      border-top: 1px solid #e9ecef;
+    }
+
+    .input-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    textarea {
+      flex: 1;
+      padding: 14px;
+      border: 2px solid #e9ecef;
+      border-radius: 12px;
+      resize: vertical;
+      min-height: 80px;
+      font-family: inherit;
+      font-size: 1rem;
+      transition: border-color 0.3s;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .input-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.3s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .send-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .send-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .secondary-btn {
+      background: #f8f9fa;
+      color: #495057;
+      border: 1px solid #e9ecef;
+    }
+
+    .secondary-btn:hover {
+      background: #e9ecef;
+    }
+
+    .sidebar {
+      background: white;
+      border-left: 1px solid #e9ecef;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+
+    .config-section {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .config-section h3 {
+      color: #495057;
+      font-size: 1.1rem;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #f8f9fa;
+      margin-bottom: 10px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 0.9rem;
+      color: #495057;
+      font-weight: 500;
+    }
+
+    select, input[type="range"], input[type="number"] {
+      padding: 10px;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }
+
+    select:focus, input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .slider-value {
+      min-width: 40px;
+      text-align: center;
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .action-btn {
+      width: 100%;
+    }
+
+    .status-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 15px;
+      border-top: 1px solid #f8f9fa;
+    }
+
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      color: #6c757d;
+    }
+
+    .status-value {
+      font-weight: 500;
+      color: #495057;
+    }
+
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      border-radius: 8px;
+      color: white;
+      font-weight: 500;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      z-index: 1000;
+      transform: translateX(400px);
+      transition: transform 0.3s ease-out;
+    }
+
+    .notification.show {
+      transform: translateX(0);
+    }
+
+    .notification-success {
+      background: linear-gradient(135deg, #28a745, #20c997);
+    }
+
+    .notification-error {
+      background: linear-gradient(135deg, #dc3545, #fd7e14);
+    }
+
+    .notification-info {
+      background: linear-gradient(135deg, #17a2b8, #6f42c1);
+    }
+
+    .token-counter {
+      display: inline-block;
+      background: #e9ecef;
+      color: #495057;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      margin-left: 8px;
+    }
+
+    .welcome-message {
+      text-align: center;
+      padding: 40px 20px;
+      color: #6c757d;
+    }
+
+    .welcome-message h2 {
+      margin-bottom: 15px;
+      color: #495057;
+    }
+
+    .welcome-message p {
+      max-width: 600px;
+      margin: 0 auto 20px;
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🤖 Qwen AI 组件测试平台</h1>
+      <p>黄氏家族寻根平台 - AI 对话功能测试</p>
+    </div>
+
+    <div class="main-content">
+      <div class="chat-section" id="qwenContainer">
+        <div class="chat-header">
+          <div class="chat-title">Qwen AI 助手</div>
+          <div class="chat-stats">
+            Token 用量: <span id="qwenTokens">0</span>
+          </div>
+        </div>
+
+        <div class="messages-container" id="qwenMessages">
+          <div class="welcome-message">
+            <h2>🎉 欢迎使用 Qwen AI 测试平台</h2>
+            <p>这是一个现代化的 AI 对话界面，专为黄氏家族寻根平台设计。您可以在此测试 AI 对话功能、模型选择和各项配置。</p>
+            <p>请输入您的问题，Qwen AI 将为您提供智能回答。</p>
+          </div>
+        </div>
+
+        <div class="typing-indicator" id="qwenTypingIndicator">
+          <div class="typing-dots">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+          </div>
+          <span>Qwen AI 正在思考中...</span>
+        </div>
+
+        <div class="input-area">
+          <div class="input-form">
+            <div class="input-row">
+              <textarea 
+                id="qwenInput" 
+                placeholder="请输入您的问题...（按 Enter 发送，Shift+Enter 换行）"
+              ></textarea>
+            </div>
+            <div class="input-buttons">
+              <button class="secondary-btn" id="qwenClearBtn">
+                <span>🗑️</span>
+                <span>清空对话</span>
+              </button>
+              <button class="secondary-btn" id="qwenConfigBtn">
+                <span>⚙️</span>
+                <span>保存配置</span>
+              </button>
+              <button class="send-btn" id="qwenSendBtn">
+                <span>发送</span>
+                <span>➤</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="config-section">
+          <h3>🔧 模型配置</h3>
+          
+          <div class="form-group">
+            <label for="qwenModelSelect">选择模型</label>
+            <select id="qwenModelSelect">
+              <option value="qwen3.5-plus">Qwen3.5 Plus (推荐)</option>
+              <option value="qwen3-max-2026-01-23">Qwen3 Max (最强推理)</option>
+              <option value="qwen3-coder-next">Qwen3 Coder Next (代码)</option>
+              <option value="qwen3-coder-plus">Qwen3 Coder Plus (代码增强)</option>
+              <option value="qwen-max">Qwen Max (复杂任务)</option>
+              <option value="qwen-plus">Qwen Plus (平衡性能)</option>
+              <option value="qwen-turbo">Qwen Turbo (快速响应)</option>
+              <option value="qwen-mini">Qwen Mini (轻量高效)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="qwenTemperature">
+              创造力 (Temperature): <span id="tempValue">0.7</span>
+            </label>
+            <div class="slider-container">
+              <input 
+                type="range" 
+                id="qwenTemperature" 
+                min="0" 
+                max="1" 
+                step="0.1" 
+                value="0.7"
+              >
+              <span class="slider-value" id="tempValue">0.7</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="qwenMaxTokens">最大 Token 数</label>
+            <input 
+              type="number" 
+              id="qwenMaxTokens" 
+              min="1" 
+              max="8192" 
+              value="2048"
+            >
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="action-btn secondary-btn" id="qwenTestApiBtn">
+            <span>📡</span>
+            <span>测试 API 连接</span>
+          </button>
+          <button class="action-btn secondary-btn" id="qwenLoadModelsBtn">
+            <span>📋</span>
+            <span>加载模型列表</span>
+          </button>
+          <button class="action-btn secondary-btn" id="qwenGetTokenBtn">
+            <span>🔑</span>
+            <span>获取认证 Token</span>
+          </button>
+        </div>
+
+        <div class="status-section">
+          <div class="status-item">
+            <span>连接状态:</span>
+            <span class="status-value" id="connectionStatus">未知</span>
+          </div>
+          <div class="status-item">
+            <span>当前模型:</span>
+            <span class="status-value" id="currentModel">qwen3.5-plus</span>
+          </div>
+          <div class="status-item">
+            <span>会话 ID:</span>
+            <span class="status-value" id="sessionId">-</span>
+          </div>
+          <div class="status-item">
+            <span>总 Token 数:</span>
+            <span class="status-value" id="totalTokens">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    // 设置API配置
+    window.API_CONFIG = {
+      baseURL: window.location.hostname === 'localhost' 
+        ? 'http://localhost:3000' 
+        : 'https://api.hxfund.cn',
+      timeout: 30000
+    };
+
+    // 导入Qwen AI组件
+    try {
+      const { default: QwenAI } = await import('./js/components/qwen-ai.js');
+      
+      // 初始化Qwen AI组件
+      const qwenAI = new QwenAI({
+        containerId: 'qwenContainer',
+        apiBaseURL: window.API_CONFIG.baseURL
+      });
+      
+      // 添加到全局作用域以便调试
+      window.qwenAI = qwenAI;
+      
+      console.log('✅ Qwen AI 组件已成功初始化');
+    } catch (error) {
+      console.error('❌ Qwen AI 组件初始化失败:', error);
+      
+      // 创建错误消息显示
+      const errorMsg = document.createElement('div');
+      errorMsg.className = 'notification notification-error show';
+      errorMsg.textContent = `Qwen AI 初始化失败: ${error.message}`;
+      document.body.appendChild(errorMsg);
+      
+      // 3秒后移除错误消息
+      setTimeout(() => {
+        errorMsg.remove();
+      }, 3000);
+    }
+
+    // 添加测试按钮功能
+    document.getElementById('qwenTestApiBtn')?.addEventListener('click', async () => {
+      try {
+        const response = await fetch(`${window.API_CONFIG.baseURL}/api/health`);
+        const data = await response.json();
+        
+        const notification = document.createElement('div');
+        notification.className = 'notification notification-success show';
+        notification.textContent = `API 测试成功: ${data.status}`;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          notification.remove();
+        }, 3000);
+      } catch (error) {
+        const notification = document.createElement('div');
+        notification.className = 'notification notification-error show';
+        notification.textContent = `API 测试失败: ${error.message}`;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          notification.remove();
+        }, 3000);
+      }
+    });
+
+    document.getElementById('qwenLoadModelsBtn')?.addEventListener('click', async () => {
+      try {
+        const response = await fetch(`${window.API_CONFIG.baseURL}/api/models`);
+        const data = await response.json();
+        
+        if (data.success) {
+          const modelSelect = document.getElementById('qwenModelSelect');
+          modelSelect.innerHTML = data.models.map(model => 
+            `<option value="${model.id}">${model.name} (${model.id})</option>`
+          ).join('');
+          
+          const notification = document.createElement('div');
+          notification.className = 'notification notification-success show';
+          notification.textContent = `模型列表加载成功: ${data.models.length} 个模型`;
+          document.body.appendChild(notification);
+          
+          setTimeout(() => {
+            notification.remove();
+          }, 3000);
+        }
+      } catch (error) {
+        const notification = document.createElement('div');
+        notification.className = 'notification notification-error show';
+        notification.textContent = `模型列表加载失败: ${error.message}`;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          notification.remove();
+        }, 3000);
+      }
+    });
+
+    document.getElementById('qwenGetTokenBtn')?.addEventListener('click', async () => {
+      try {
+        const response = await fetch(`${window.API_CONFIG.baseURL}/api/auth/client-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+          const notification = document.createElement('div');
+          notification.className = 'notification notification-success show';
+          notification.textContent = '认证 Token 获取成功';
+          document.body.appendChild(notification);
+          
+          setTimeout(() => {
+            notification.remove();
+          }, 3000);
+        }
+      } catch (error) {
+        const notification = document.createElement('div');
+        notification.className = 'notification notification-error show';
+        notification.textContent = `Token 获取失败: ${error.message}`;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          notification.remove();
+        }, 3000);
+      }
+    });
+  </script>
+</body>
+</html>

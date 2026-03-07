@@ -12,14 +12,14 @@
          SEO & PWA 配置
     ============================================= -->
     <link rel="canonical" href="https://hxfund.cn/">
-    <link rel="manifest" href="./pwa/manifest.json">
+    <link rel="manifest" href="/pwa/manifest.json">
     <meta name="theme-color" content="#8B4513">
 
     <!-- Apple 设备配置 -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="黄氏寻根">
-    <link rel="apple-touch-icon" href="./assets/images/icon-192.png">
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
 
     <!-- ============================================
          API 配置（部署时修改为实际地址）
@@ -48,8 +48,8 @@
     </style>
 
     <!-- 非关键 CSS 异步加载 -->
-    <link rel="preload" href="./css/style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="./css/style.css"></noscript>
+    <link rel="preload" href="/css/style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="/css/style.css"></noscript>
 </head>
 
 <body>
@@ -80,6 +80,7 @@
                 <a href="#ppt" class="nav-link" id="nav-ppt">介绍</a>
                 <a href="#blockchain" class="nav-link" id="nav-blockchain">存证</a>
                 <a href="#guestbook" class="nav-link" id="nav-guestbook">留言</a>
+                <a href="https://www.hxfund.cn/blog/" class="nav-link" id="nav-blog" target="_blank" rel="noopener">博客</a>
             </nav>
             <button class="hamburger" id="hamburgerBtn" aria-label="菜单">
                 <span></span>
@@ -254,7 +255,7 @@
                                 <div class="qwen-avatar ai-avatar">🤖</div>
                                 <div class="qwen-content">
                                     <div class="qwen-name">Qwen AI</div>
-                                    <div class="qwen-text">您好！我是通义千问 AI 助手，专门为您解答关于黄氏家族寻根的相关问题。您可以问我关于族谱、字辈、历史等方面的问题。</div>
+                                    <div class="qwen-text">您好！我是通义千问 AI 助手，专门为您解答关于黄氏家族寻根的相关问题。您可以问我关于族谱、字辈、历史等方面的问题。<br><br>💡 <strong>小贴士</strong>：如果遇到连接问题，可以点击右下角的"🔄 刷新连接"按钮重新连接服务。</div>
                                 </div>
                             </div>
                         </div>
@@ -458,6 +459,7 @@
                 <a href="#ppt">项目愿景</a>
                 <a href="#blockchain">区块链存证</a>
                 <a href="#guestbook">留言墙</a>
+                <a href="https://www.hxfund.cn/blog/" target="_blank" rel="noopener">博客</a>
             </div>
             <div class="footer-info">
                 <p>© 2024 黄氏家族寻根平台 (hxfund.cn) · 传承家风，继往开来</p>
@@ -475,12 +477,8 @@
     <!-- ============================================
          脚本文件：模块化加载
     ============================================= -->
-    <script type="module" src="./js/main.js"></script>
-    <script type="module" src="./js/components/qwen-ai.js"></script>
-    <script type="module" src="./js/components/family-tree.js"></script>
-    <script type="module" src="./js/components/generation-calculator.js"></script>
-    <script type="module" src="./js/components/blockchain-verifier.js"></script>
-    <script type="module" src="./js/utils/error-monitor.js"></script>
-    <script type="module" src="./js/utils/web-vitals.js"></script>
+    <script type="module" src="/js/main.js"></script>
+    <!-- Web Vitals 监控 -->
+    <script type="module" src="/js/web-vitals.js"></script>
 </body>
 </html>

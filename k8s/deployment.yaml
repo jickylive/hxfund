@@ -1,0 +1,144 @@
+# k8s/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: huangshi-genealogy
+---
+# k8s/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: huangshi-config
+  namespace: huangshi-genealogy
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  REDIS_URL: "redis://huangshi-redis:6379"
+---
+# k8s/secrets.yaml (示例模板)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: huangshi-secrets
+  namespace: huangshi-genealogy
+type: Opaque
+data:
+  # 注意：这些值应该是base64编码的
+  QWEN_API_KEY: <base64-encoded-value>
+  JWT_SECRET: <base64-encoded-value>
+---
+# k8s/redis-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: huangshi-redis
+  namespace: huangshi-genealogy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: huangshi-redis
+  template:
+    metadata:
+      labels:
+        app: huangshi-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+---
+# k8s/api-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: huangshi-api
+  namespace: huangshi-genealogy
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: huangshi-api
+  template:
+    metadata:
+      labels:
+        app: huangshi-api
+    spec:
+      containers:
+      - name: api
+        image: huangshi/api:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: huangshi-config
+        - secretRef:
+            name: huangshi-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "400m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+---
+# k8s/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: huangshi-api-service
+  namespace: huangshi-genealogy
+spec:
+  selector:
+    app: huangshi-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: LoadBalancer
+---
+# k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: huangshi-ingress
+  namespace: huangshi-genealogy
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - api.hxfund.cn
+    secretName: huangshi-tls
+  rules:
+  - host: api.hxfund.cn
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: huangshi-api-service
+            port:
+              number: 80
