@@ -86,8 +86,9 @@ try {
         set ftp:ssl-protect-data true;
         open ftp://${ftpConfig.host}:${ftpConfig.port};
         user "${escapedUser}" "${escapedPass}";
-        mkdir -p ${TARGET_DIR}/hxfund;
-        cd ${TARGET_DIR}/hxfund;
+        # 检查目标目录是否存在，如果不存在则创建
+        mkdir -p ${TARGET_DIR};
+        cd ${TARGET_DIR};
         lcd ${SOURCE_DIR};
         mirror --reverse --delete --verbose;
         bye

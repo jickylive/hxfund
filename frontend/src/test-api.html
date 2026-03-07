@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Qwen AI 测试页面</title>
+    <script>
+        // 设置API配置
+        window.API_CONFIG = {
+            baseURL: 'http://localhost:3000',
+            timeout: 30000
+        };
+    </script>
+</head>
+<body>
+    <h1>Qwen AI 测试页面</h1>
+    <div id="test-results"></div>
+    
+    <script type="module">
+        // 导入API客户端
+        async function testAPI() {
+            try {
+                // 动态导入API客户端
+                const { APIClient } = await import('./utils/api-client.js?url');
+                const apiClient = new APIClient();
+                
+                const resultsDiv = document.getElementById('test-results');
+                
+                // 测试获取模型列表
+                try {
+                    const models = await apiClient.getModels();
+                    resultsDiv.innerHTML += '<p>✅ 模型列表获取成功: ' + models.models.length + ' 个模型</p>';
+                    
+                    // 测试获取认证token
+                    try {
+                        const tokenResult = await apiClient.getClientToken();
+                        resultsDiv.innerHTML += '<p>✅ 认证Token获取成功</p>';
+                        
+                        // 测试会话对话API
+                        try {
+                            const conversationResult = await apiClient.conversation({
+                                message: "你好",
+                                model: "qwen3.5-plus",
+                                temperature: 0.7
+                            });
+                            resultsDiv.innerHTML += '<p>✅ 对话API调用成功</p>';
+                        } catch (convError) {
+                            resultsDiv.innerHTML += '<p>❌ 对话API调用失败: ' + convError.message + '</p>';
+                        }
+                    } catch (tokenError) {
+                        resultsDiv.innerHTML += '<p>❌ 认证Token获取失败: ' + tokenError.message + '</p>';
+                    }
+                } catch (modelsError) {
+                    resultsDiv.innerHTML += '<p>❌ 模型列表获取失败: ' + modelsError.message + '</p>';
+                }
+            } catch (error) {
+                console.error('测试失败:', error);
+                document.getElementById('test-results').innerHTML = '<p>❌ 测试失败: ' + error.message + '</p>';
+            }
+        }
+        
+        // 执行测试
+        testAPI();
+    </script>
+</body>
+</html>

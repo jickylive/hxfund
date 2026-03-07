@@ -304,6 +304,10 @@ async function build() {
     console.log('║     黄氏家族寻根平台 - 静态资源构建                       ║');
     console.log('╚═══════════════════════════════════════════════════════════╝\n');
 
+    // 定义目录路径
+    const DIST_DIR = path.join(__dirname, '..', 'dist');
+    const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+    
     // 清理并创建目录
     console.log('📁 创建目录结构...');
     if (fs.existsSync(DIST_DIR)) {
@@ -361,6 +365,273 @@ async function build() {
     console.log('║  输出目录：dist/                                          ║');
     console.log('║  部署说明：将 dist/ 目录内容上传到 CDN 或静态主机           ║');
     console.log('╚═══════════════════════════════════════════════════════════╝\n');
+}
+
+// 辅助函数定义
+function ensureDir(dir) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+}
+
+function copyDir(src, dest) {
+    ensureDir(dest);
+    const entries = fs.readdirSync(src, { withFileTypes: true });
+
+    for (const entry of entries) {
+        const srcPath = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+
+        if (entry.isDirectory()) {
+            copyDir(srcPath, destPath);
+        } else {
+            fs.copyFileSync(srcPath, destPath);
+        }
+    }
+}
+
+// 处理 CSS 文件
+function processCSS() {
+    console.log('\n📄 处理 CSS 文件...');
+    const cssSrc = path.join(PUBLIC_DIR, 'css', 'style.css');
+    const cssDest = path.join(DIST_DIR, 'css', 'style.css');
+    const cssMinDest = path.join(DIST_DIR, 'css', 'style.min.css');
+
+    if (fs.existsSync(cssSrc)) {
+        const css = fs.readFileSync(cssSrc, 'utf-8');
+
+        // 复制原始文件
+        fs.writeFileSync(cssDest, css, 'utf-8');
+        console.log(`  ✓ css/style.css`);
+
+        // 生成压缩版本
+        const minified = minifyCSS(css);
+        fs.writeFileSync(cssMinDest, minified, 'utf-8');
+        console.log(`  ✓ css/style.min.css (${(minified.length / 1024).toFixed(2)} KB)`);
+
+        return {
+            original: css.length,
+            minified: minified.length,
+            savings: ((1 - minified.length / css.length) * 100).toFixed(1)
+        };
+    } else {
+        console.log('  ℹ️  css/style.css 不存在，跳过');
+        return { original: 0, minified: 0, savings: '0' };
+    }
+}
+
+// 压缩 JS（使用 terser）
+async function processJS() {
+    console.log('\n📄 处理 JS 文件...');
+    const jsFiles = ['data.js', 'main.js', 'modules.js', 'script.js'];
+    const stats = [];
+
+    for (const file of jsFiles) {
+        const src = path.join(PUBLIC_DIR, 'js', file);
+        const dest = path.join(DIST_DIR, 'js', file);
+        const minDest = path.join(DIST_DIR, 'js', file.replace('.js', '.min.js'));
+
+        if (!fs.existsSync(src)) {
+            console.log(`  ℹ️  js/${file} 不存在，跳过`);
+            continue;
+        }
+
+        const js = fs.readFileSync(src, 'utf-8');
+
+        // 复制原始文件
+        fs.writeFileSync(dest, js, 'utf-8');
+        console.log(`  ✓ js/${file}`);
+
+        // 使用 terser 生成压缩版本
+        try {
+            const terserModule = await getTerser();
+            const minified = await terserModule.minify(js, {
+                compress: {
+                    drop_console: false,
+                    drop_debugger: false,
+                    pure_funcs: []
+                },
+                mangle: {
+                    reserved: ['familyTreeData', 'generationPoems', 'pptSlides', 'bcRecords', 'guestMessages']
+                },
+                output: {
+                    comments: false
+                }
+            });
+
+            fs.writeFileSync(minDest, minified.code, 'utf-8');
+            console.log(`  ✓ js/${file.replace('.js', '.min.js')} (${(minified.code.length / 1024).toFixed(2)} KB)`);
+
+            stats.push({
+                file,
+                original: js.length,
+                minified: minified.code.length,
+                savings: ((1 - minified.code.length / js.length) * 100).toFixed(1)
+            });
+        } catch (error) {
+            console.error(`  ✗ 压缩失败 js/${file}: ${error.message}`);
+            // 降级到简单压缩
+            const simpleMinified = js
+                .replace(/\/\*[\s\S]*?\*\//g, '')
+                .replace(/\/\/.*$/gm, '')
+                .trim();
+            fs.writeFileSync(minDest, simpleMinified, 'utf-8');
+            stats.push({
+                file,
+                original: js.length,
+                minified: simpleMinified.length,
+                savings: ((1 - simpleMinified.length / js.length) * 100).toFixed(1)
+            });
+        }
+    }
+
+    return stats;
+}
+
+// 生成优化版 HTML
+function generateHTML() {
+    console.log('\n📄 生成优化版 HTML...');
+
+    const htmlSrc = path.join(PUBLIC_DIR, 'index.html');
+    const htmlDest = path.join(DIST_DIR, 'index.html');
+
+    if (fs.existsSync(htmlSrc)) {
+        let html = fs.readFileSync(htmlSrc, 'utf-8');
+
+        // 替换为压缩版本
+        html = html.replace('href="/css/style.css"', 'href="/css/style.min.css"');
+        html = html.replace('src="/js/data.js"', 'src="/js/data.min.js"');
+        html = html.replace('src="/js/main.js"', 'src="/js/main.min.js"');
+        html = html.replace('src="/js/modules.js"', 'src="/js/modules.min.js"');
+        html = html.replace('src="/js/script.js"', 'src="/js/script.min.js"');
+
+        // 添加 CDN 预加载和 SEO 优化
+        const preloadLinks = `
+    <!-- CDN 预加载 -->
+    <link rel="dns-prefetch" href="//fonts.googleapis.com">
+    <link rel="dns-prefetch" href="//fonts.gstatic.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- PWA 配置 -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#8B4513">
+
+    <!-- SEO 优化 -->
+    <meta name="keywords" content="黄氏家族，寻根，族谱，字辈，黄姓，宗亲会，家族文化">
+    <meta name="author" content="黄氏家族寻根平台">
+    <link rel="canonical" href="https://hxfund.cn/">
+
+    <!-- 社交媒体分享优化 -->
+    <meta property="og:title" content="黄氏家族寻根平台 | hxfund.cn">
+    <meta property="og:description" content="数字化传承黄氏家族文化，帮助全球宗亲查询族谱、字辈与寻根问祖。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://hxfund.cn/">
+    <meta name="twitter:card" content="summary_large_image">`;
+
+        html = html.replace('</head>', preloadLinks + '\n</head>');
+
+        fs.writeFileSync(htmlDest, html, 'utf-8');
+        console.log(`  ✓ index.html`);
+
+        return html.length;
+    } else {
+        console.log('  ℹ️  index.html 不存在，跳过');
+        return 0;
+    }
+}
+
+// 生成资源清单
+function generateManifest(stats) {
+    console.log('\n📋 生成资源清单...');
+
+    const manifest = {
+        version: '3.2.0',
+        buildTime: new Date().toISOString(),
+        files: {
+            css: {
+                'style.css': stats.css,
+                'style.min.css': { size: stats.css.minified, savings: stats.css.savings + '%' }
+            },
+            js: stats.js.map(s => ({
+                file: s.file,
+                original: s.original,
+                minified: s.minified,
+                savings: s.savings + '%'
+            }))
+        },
+        totalSavings: {
+            css: stats.css.savings + '%',
+            js: (stats.js.reduce((sum, s) => sum + s.minified, 0) / stats.js.reduce((sum, s) => sum + s.original, 0) * 100).toFixed(1) + '%'
+        }
+    };
+
+    const dest = path.join(DIST_DIR, 'manifest.json');
+    fs.writeFileSync(dest, JSON.stringify(manifest, null, 2), 'utf-8');
+    console.log(`  ✓ manifest.json`);
+
+    return manifest;
+}
+
+// 备份会话数据（压缩格式）
+async function backupSessionData() {
+    console.log('\n💾 备份会话数据...');
+
+    // 创建备份目录
+    const backupDir = path.join(DIST_DIR, 'backups');
+    ensureDir(backupDir);
+
+    try {
+        // 检查是否有会话数据需要备份
+        const sessionStorePath = path.join(__dirname, '..', 'server', 'session-store.js');
+        if (!fs.existsSync(sessionStorePath)) {
+            console.log('  ℹ️  会话存储模块不存在，跳过备份');
+            return;
+        }
+
+        // 读取当前会话数据（如果是内存存储的话）
+        // 在实际部署中，会话数据可能存储在 Redis 或其他地方
+        // 这里我们创建一个示例备份
+
+        const sessionBackup = {
+            timestamp: new Date().toISOString(),
+            note: '会话数据备份 - 仅用于演示目的，实际会话数据可能存储在 Redis 或其他持久化存储中',
+            backupType: 'session-data-compression-backup'
+        };
+
+        // 将备份数据转换为 JSON
+        const sessionData = JSON.stringify(sessionBackup, null, 2);
+
+        // 压缩数据
+        const compressedData = zlib.gzipSync(sessionData);
+
+        // 保存压缩的备份文件
+        const backupFileName = `sessions-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json.gz`;
+        const backupFilePath = path.join(backupDir, backupFileName);
+
+        fs.writeFileSync(backupFilePath, compressedData);
+
+        console.log(`  ✓ ${path.relative(DIST_DIR, backupFilePath)} (${(compressedData.length / 1024).toFixed(2)} KB)`);
+
+        // 同时保存未压缩的备份作为参考
+        const uncompressedBackupPath = path.join(backupDir, backupFileName.replace('.gz', '.json'));
+        fs.writeFileSync(uncompressedBackupPath, sessionData);
+
+        console.log(`  ✓ ${path.relative(DIST_DIR, uncompressedBackupPath)} (${(sessionData.length / 1024).toFixed(2)} KB)`);
+
+    } catch (error) {
+        console.error(`  ✗ 会话数据备份失败: ${error.message}`);
+    }
+}
+
+// 简单压缩 CSS（移除注释和多余空白）
+function minifyCSS(css) {
+    return css
+        .replace(/\/\*[\s\S]*?\*\//g, '')  // 移除注释
+        .replace(/\s+/g, ' ')              // 多余空白变单空格
+        .replace(/\s*([{}:;,])\s*/g, '$1') // 移除符号周围空格
+        .replace(/\n/g, '')                // 移除换行
+        .trim();
 }
 
 // 运行构建

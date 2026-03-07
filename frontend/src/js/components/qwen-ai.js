@@ -1,302 +1,524 @@
 /**
- * 黄氏家族寻根平台 - Qwen AI 客户端组件
- * 增强版 v3.2.0 - 支持认证、多轮对话、模块化设计
+ * 黄氏家族寻根平台 - Qwen AI 主组件
+ * 采用模块化架构，集成所有子模块
  */
 
-import { APIManager } from '../utils/api-manager.js';
-import { LocalStorageManager } from '../utils/storage-manager.js';
-import { UIHelper } from '../utils/ui-helper.js';
+import { MessageManager } from './utils/message-manager.js';
+import { SessionManager } from './utils/session-manager.js';
+import { QwenApiClient } from './utils/api-client.js';
+import { ConfigManager } from './utils/config-manager.js';
+import { EventManager } from './utils/event-manager.js';
 
-class QwenAI {
-    constructor() {
-        this.qwenMessages = document.getElementById('qwenMessages');
-        this.qwenInput = document.getElementById('qwenInput');
-        this.qwenSendBtn = document.getElementById('qwenSendBtn');
-        this.qwenTokens = document.getElementById('qwenTokens');
-        this.qwenModelSelect = document.getElementById('qwenModelSelect');
-        this.qwenTemperature = document.getElementById('qwenTemperature');
-        this.tempValue = document.getElementById('tempValue');
-
-        this.selectedImageFile = null;
-        this.sessionId = null;
-        this.totalTokens = 0;
-        this.authToken = null;
-        this.tokenExpiresAt = null;
-
-        this.apiManager = new APIManager();
-        this.storageManager = new LocalStorageManager();
-        this.uiHelper = new UIHelper();
-
-        this.init();
+export class QwenAI {
+  constructor(options = {}) {
+    // DOM元素引用
+    this.containerId = options.containerId || 'qwenContainer';
+    this.container = document.getElementById(this.containerId);
+    
+    if (!this.container) {
+      throw new Error(`找不到ID为"${this.containerId}"的容器元素`);
     }
 
-    async init() {
-        // 加载配置
-        this.loadConfig();
+    // 初始化子模块
+    this.messageManager = new MessageManager('qwenMessages');
+    this.sessionManager = new SessionManager();
+    this.apiClient = new QwenApiClient(options.apiBaseURL);
+    this.configManager = new ConfigManager();
+    this.eventManager = new EventManager();
+    
+    // 组件状态
+    this.state = {
+      isLoading: false,
+      isConnected: false,
+      currentSessionId: null,
+      totalTokens: 0,
+      errorMessage: null
+    };
+    
+    // 绑定方法上下文
+    this.handleSendMessage = this.handleSendMessage.bind(this);
+    this.handleModelChange = this.handleModelChange.bind(this);
+    this.handleTemperatureChange = this.handleTemperatureChange.bind(this);
+    
+    // 初始化组件
+    this.init();
+  }
 
-        // 绑定事件
-        this.bindEvents();
-
-        // 加载模型列表
-        await this.loadModels();
+  /**
+   * 初始化组件
+   */
+  async init() {
+    try {
+      // 初始化配置
+      this.configManager.initializeUI();
+      
+      // 绑定事件
+      this.bindEvents();
+      
+      // 初始化UI
+      this.initializeUI();
+      
+      // 加载模型列表
+      await this.loadModels();
+      
+      // 连接到服务
+      await this.connect();
+      
+      console.log('✅ Qwen AI 组件初始化完成');
+      
+      // 发布初始化完成事件
+      this.eventManager.publish('qwen:initialized', {
+        timestamp: Date.now(),
+        containerId: this.containerId
+      });
+      
+    } catch (error) {
+      console.error('❌ Qwen AI 组件初始化失败:', error);
+      this.showError(`初始化失败: ${error.message}`);
     }
+  }
 
-    // 加载配置
-    loadConfig() {
-        const saved = this.storageManager.get('qwenConfig');
-        if (saved) {
-            const config = JSON.parse(saved);
-            this.qwenModelSelect.value = config.model || 'qwen3.5-plus';
-            this.qwenTemperature.value = config.temperature || '0.7';
-            this.tempValue.textContent = config.temperature || '0.7';
+  /**
+   * 绑定事件处理器
+   */
+  bindEvents() {
+    // 发送消息事件
+    const sendButton = document.getElementById('qwenSendBtn');
+    const inputArea = document.getElementById('qwenInput');
+    
+    if (sendButton) {
+      sendButton.addEventListener('click', this.handleSendMessage);
+    }
+    
+    if (inputArea) {
+      inputArea.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          this.handleSendMessage();
         }
-
-        // 优先从 sessionStorage 加载 Token（更安全）
-        const sessionToken = sessionStorage.getItem('authToken');
-        const sessionExpires = sessionStorage.getItem('tokenExpiresAt');
-
-        if (sessionToken && sessionExpires) {
-            const expiresAt = parseInt(sessionExpires);
-            if (expiresAt > Date.now()) {
-                this.authToken = sessionToken;
-                this.tokenExpiresAt = expiresAt;
-                console.log('✓ 已加载 session 中的认证 Token');
-                return;
-            }
-        }
-
-        // sessionStorage 无有效 Token，尝试从 localStorage 加载
-        if (saved) {
-            const config = JSON.parse(saved);
-            if (config.token && config.tokenExpiresAt && config.tokenExpiresAt > Date.now()) {
-                this.authToken = config.token;
-                this.tokenExpiresAt = config.tokenExpiresAt;
-                console.log('✓ 已加载 localStorage 中的认证 Token');
-            }
-        }
+      });
     }
-
-    // 保存配置
-    saveConfig() {
-        const config = {
-            model: this.qwenModelSelect.value,
-            temperature: this.qwenTemperature.value,
-            token: this.authToken,
-            tokenExpiresAt: this.tokenExpiresAt
-        };
-        this.storageManager.set('qwenConfig', JSON.stringify(config));
-        alert('配置已保存！');
+    
+    // 模型选择变化
+    const modelSelect = document.getElementById('qwenModelSelect');
+    if (modelSelect) {
+      modelSelect.addEventListener('change', this.handleModelChange);
     }
+    
+    // 温度变化
+    const temperatureSlider = document.getElementById('qwenTemperature');
+    if (temperatureSlider) {
+      temperatureSlider.addEventListener('input', this.handleTemperatureChange);
+    }
+    
+    // 配置保存
+    const saveConfigBtn = document.getElementById('qwenSaveConfig');
+    if (saveConfigBtn) {
+      saveConfigBtn.addEventListener('click', () => {
+        this.saveConfiguration();
+      });
+    }
+  }
 
-    // 绑定事件
-    bindEvents() {
-        // 温度值更新
-        this.qwenTemperature.addEventListener('input', () => {
-            this.tempValue.textContent = this.qwenTemperature.value;
+  /**
+   * 初始化UI元素
+   */
+  initializeUI() {
+    // 设置初始配置值
+    const modelSelect = document.getElementById('qwenModelSelect');
+    const temperatureSlider = document.getElementById('qwenTemperature');
+    const temperatureValue = document.getElementById('tempValue');
+    
+    if (modelSelect) {
+      modelSelect.value = this.configManager.get('model');
+    }
+    
+    if (temperatureSlider && temperatureValue) {
+      const temp = this.configManager.get('temperature');
+      temperatureSlider.value = temp;
+      temperatureValue.textContent = temp;
+    }
+  }
+
+  /**
+   * 连接到Qwen服务
+   */
+  async connect() {
+    try {
+      this.setState({ isLoading: true, errorMessage: null });
+      
+      // 获取认证令牌
+      const token = await this.apiClient.getAuthToken();
+      
+      if (token) {
+        this.setState({ isConnected: true, isLoading: false });
+        console.log('✅ 已连接到Qwen服务');
+        
+        // 发布连接成功事件
+        this.eventManager.publish('qwen:connected', {
+          timestamp: Date.now(),
+          token: token.substring(0, 8) + '...' // 只记录令牌前几位用于调试
         });
+      } else {
+        throw new Error('无法获取认证令牌');
+      }
+    } catch (error) {
+      console.error('连接Qwen服务失败:', error);
+      this.setState({ 
+        isConnected: false, 
+        isLoading: false, 
+        errorMessage: error.message 
+      });
+      this.showError(`连接失败: ${error.message}`);
+    }
+  }
 
-        // 图片上传
-        const qwenImageUpload = document.getElementById('qwenImageUpload');
-        const qwenImagePreview = document.getElementById('qwenImagePreview');
+  /**
+   * 加载模型列表
+   */
+  async loadModels() {
+    try {
+      const models = await this.apiClient.getModels();
+      
+      const modelSelect = document.getElementById('qwenModelSelect');
+      if (modelSelect && models.success) {
+        modelSelect.innerHTML = models.models.map(model => 
+          `<option value="${model.id}" ${model.default ? 'selected' : ''}>
+            ${model.name} (${model.id})${model.default ? ' - 默认' : ''}
+           </option>`
+        ).join('');
+        
+        // 设置默认模型
+        const savedModel = this.configManager.get('model');
+        if (savedModel && models.models.some(m => m.id === savedModel)) {
+          modelSelect.value = savedModel;
+        }
+      }
+    } catch (error) {
+      console.error('加载模型列表失败:', error);
+      this.showError(`模型列表加载失败: ${error.message}`);
+    }
+  }
 
-        qwenImageUpload.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file && file.type.match('image.*')) {
-                this.selectedImageFile = file;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    qwenImagePreview.innerHTML = `<img src="${event.target.result}" alt="预览">`;
-                    qwenImagePreview.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
+  /**
+   * 处理发送消息事件
+   */
+  async handleSendMessage() {
+    const inputElement = document.getElementById('qwenInput');
+    if (!inputElement) return;
+
+    const message = inputElement.value.trim();
+    if (!message) {
+      this.showValidationError('请输入消息内容');
+      return;
+    }
+
+    if (this.state.isLoading) {
+      console.log('请求正在进行中，请稍候...');
+      return;
+    }
+
+    try {
+      this.setState({ isLoading: true });
+      
+      // 添加用户消息到界面
+      this.messageManager.addMessage('user', message);
+      
+      // 清空输入框
+      inputElement.value = '';
+      
+      // 显示打字指示器
+      this.messageManager.showTypingIndicator();
+      
+      // 获取当前配置
+      const model = document.getElementById('qwenModelSelect')?.value || this.configManager.get('model');
+      const temperature = parseFloat(document.getElementById('qwenTemperature')?.value || this.configManager.get('temperature'));
+      
+      // 调用API
+      const response = await this.apiClient.chat({
+        message,
+        model,
+        temperature,
+        sessionId: this.state.currentSessionId
+      });
+      
+      // 隐藏打字指示器
+      this.messageManager.hideTypingIndicator();
+      
+      if (response.success) {
+        // 更新会话ID
+        if (response.sessionId) {
+          this.state.currentSessionId = response.sessionId;
+        }
+        
+        // 添加AI响应
+        this.messageManager.addMessage('ai', response.response, {
+          tokensUsed: response.usage?.total_tokens,
+          model: response.model
         });
-
-        // 发送按钮
-        this.qwenSendBtn.addEventListener('click', () => this.sendMessage());
-
-        // 回车发送
-        this.qwenInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey) {
-                e.preventDefault();
-                this.sendMessage();
-            }
+        
+        // 更新token统计
+        if (response.usage?.total_tokens) {
+          this.state.totalTokens += response.usage.total_tokens;
+          const tokenCounter = document.getElementById('qwenTokens');
+          if (tokenCounter) {
+            tokenCounter.textContent = this.state.totalTokens;
+          }
+        }
+        
+        // 保存消息到会话历史
+        this.sessionManager.addMessageToHistory('user', message);
+        this.sessionManager.addMessageToHistory('assistant', response.response);
+        
+        console.log(`✅ 消息处理成功，使用模型: ${response.model}`);
+        
+        // 发布消息成功事件
+        this.eventManager.publish('qwen:message:sent', {
+          timestamp: Date.now(),
+          messageId: response.messageId,
+          model: response.model,
+          tokensUsed: response.usage?.total_tokens
         });
-
-        // 保存配置按钮
-        const qwenSaveConfig = document.getElementById('qwenSaveConfig');
-        if (qwenSaveConfig) {
-            qwenSaveConfig.addEventListener('click', () => this.saveConfig());
-        }
+      } else {
+        throw new Error(response.error || '未知错误');
+      }
+    } catch (error) {
+      // 隐藏打字指示器
+      this.messageManager.hideTypingIndicator();
+      
+      console.error('发送消息失败:', error);
+      this.messageManager.addMessage('ai', `❌ 发生错误: ${error.message}`);
+      
+      // 如果是认证相关错误，尝试重新连接
+      if (error.message.includes('认证') || error.message.includes('token', 'Token')) {
+        this.setState({ isConnected: false });
+        setTimeout(() => this.connect(), 2000); // 2秒后重连
+      }
+      
+      // 发布消息失败事件
+      this.eventManager.publish('qwen:message:error', {
+        timestamp: Date.now(),
+        error: error.message,
+        message: inputElement?.value
+      });
+    } finally {
+      this.setState({ isLoading: false });
     }
+  }
 
-    // 加载模型列表
-    async loadModels() {
-        try {
-            const data = await this.apiManager.getModels();
-            
-            if (data.success) {
-                const currentModel = this.qwenModelSelect.value;
-                this.qwenModelSelect.innerHTML = data.models.map(m =>
-                    `<option value="${m.id}" ${m.default ? 'selected' : ''}>${m.name} (${m.id})${m.default ? ' - 默认' : ''}</option>`
-                ).join('');
-                
-                if (currentModel && data.models.some(m => m.id === currentModel)) {
-                    this.qwenModelSelect.value = currentModel;
-                }
+  /**
+   * 处理模型选择变化
+   */
+  handleModelChange(event) {
+    const newModel = event.target.value;
+    this.configManager.set('model', newModel);
+    
+    console.log(`模型已切换到: ${newModel}`);
+    
+    // 发布模型切换事件
+    this.eventManager.publish('qwen:model:changed', {
+      timestamp: Date.now(),
+      oldModel: this.configManager.get('model'),
+      newModel: newModel
+    });
+  }
 
-                // 获取认证 Token
-                await this.getAuthToken();
-            } else {
-                console.warn('加载模型列表失败:', data.error || '未知错误');
-                this.addMessage('ai', `⚠️ 模型列表加载失败：${data.error || '无法连接到服务'}`);
-            }
-        } catch (error) {
-            console.error('加载模型列表失败:', error.message);
-            this.addMessage('ai', `⚠️ 网络错误：${error.message}<br>无法加载模型列表，请检查网络连接。`);
-        }
+  /**
+   * 处理温度变化
+   */
+  handleTemperatureChange(event) {
+    const newTemp = parseFloat(event.target.value);
+    const tempValue = document.getElementById('tempValue');
+    
+    if (tempValue) {
+      tempValue.textContent = newTemp.toFixed(1);
     }
+    
+    this.configManager.set('temperature', newTemp);
+    
+    console.log(`温度已调整到: ${newTemp}`);
+    
+    // 发布温度调整事件
+    this.eventManager.publish('qwen:temperature:changed', {
+      timestamp: Date.now(),
+      oldTemp: this.configManager.get('temperature'),
+      newTemp: newTemp
+    });
+  }
 
-    // 获取认证 Token
-    async getAuthToken() {
-        // 如果已有有效 Token，直接返回
-        if (this.authToken && this.tokenExpiresAt && this.tokenExpiresAt > Date.now()) {
-            return this.authToken;
-        }
-
-        try {
-            const data = await this.apiManager.getClientToken();
-            
-            if (data.success) {
-                this.authToken = data.token;
-                this.tokenExpiresAt = Date.now() + data.expiresIn;
-
-                // 保存 Token 到 sessionStorage（更安全，会话结束自动清除）
-                sessionStorage.setItem('authToken', this.authToken);
-                sessionStorage.setItem('tokenExpiresAt', this.tokenExpiresAt.toString());
-
-                // 同时保存到 localStorage（用于持久化配置）
-                const savedConfig = JSON.parse(this.storageManager.get('qwenConfig') || '{}');
-                savedConfig.token = this.authToken;
-                savedConfig.tokenExpiresAt = this.tokenExpiresAt;
-                this.storageManager.set('qwenConfig', JSON.stringify(savedConfig));
-
-                console.log('✓ 已获取新的认证 Token');
-                return this.authToken;
-            } else {
-                console.warn('Token 获取失败:', data.error);
-                return null;
-            }
-        } catch (error) {
-            console.error('获取认证 Token 失败:', error.message);
-            this.addMessage('ai', `⚠️ 网络连接问题：${error.message}<br>请检查网络连接或稍后重试。`);
-            return null;
-        }
+  /**
+   * 保存配置
+   */
+  saveConfiguration() {
+    try {
+      const model = document.getElementById('qwenModelSelect')?.value;
+      const temperature = parseFloat(document.getElementById('qwenTemperature')?.value);
+      
+      if (model) this.configManager.set('model', model);
+      if (!isNaN(temperature)) this.configManager.set('temperature', temperature);
+      
+      // 显示保存成功的反馈
+      this.showMessage('配置已保存！', 'success');
+      
+      console.log('✅ 配置已保存');
+      
+      // 发布配置保存事件
+      this.eventManager.publish('qwen:config:saved', {
+        timestamp: Date.now(),
+        config: this.configManager.getAll()
+      });
+    } catch (error) {
+      console.error('保存配置失败:', error);
+      this.showMessage(`保存失败: ${error.message}`, 'error');
     }
+  }
 
-    // 添加消息
-    addMessage(role, content) {
-        const div = document.createElement('div');
-        div.className = `qwen-message ${role}-message`;
-        div.innerHTML = `
-            <div class="qwen-avatar ${role}-avatar">${role === 'user' ? '👤' : '🤖'}</div>
-            <div class="qwen-content">
-                <div class="qwen-name">${role === 'user' ? '您' : 'Qwen AI'}</div>
-                <div class="qwen-text">${content.replace(/\n/g, '<br>')}</div>
-            </div>
-        `;
-        this.qwenMessages.appendChild(div);
-        this.qwenMessages.scrollTop = this.qwenMessages.scrollHeight;
+  /**
+   * 设置组件状态
+   */
+  setState(newState) {
+    this.state = { ...this.state, ...newState };
+    
+    // 更新UI状态
+    this.updateUIState();
+  }
+
+  /**
+   * 更新UI状态
+   */
+  updateUIState() {
+    const sendButton = document.getElementById('qwenSendBtn');
+    const statusIndicator = document.getElementById('qwenStatus');
+    
+    if (sendButton) {
+      sendButton.disabled = this.state.isLoading;
+      sendButton.textContent = this.state.isLoading ? '发送中...' : '发送';
     }
-
-    // 发送消息
-    async sendMessage() {
-        const message = this.qwenInput.value.trim();
-        if (!message && !this.selectedImageFile) {
-            this.uiHelper.shakeElement(this.qwenInput);
-            return;
-        }
-
-        // 添加用户消息
-        let displayContent = message;
-        if (this.selectedImageFile) {
-            displayContent = `[图片：${this.selectedImageFile.name}] ${message}`;
-        }
-        this.addMessage('user', displayContent);
-
-        // 保存当前图片引用
-        const currentImage = this.selectedImageFile;
-        const currentMessage = message;
-
-        // 清空输入
-        this.qwenInput.value = '';
-        const qwenImagePreview = document.getElementById('qwenImagePreview');
-        qwenImagePreview.style.display = 'none';
-        this.selectedImageFile = null;
-
-        // 显示加载状态
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'qwen-message ai-message';
-        loadingDiv.innerHTML = `
-            <div class="qwen-avatar ai-avatar">🤖</div>
-            <div class="qwen-content">
-                <div class="qwen-name">Qwen AI</div>
-                <div class="qwen-text"><i>正在思考中...</i></div>
-            </div>
-        `;
-        this.qwenMessages.appendChild(loadingDiv);
-        this.qwenMessages.scrollTop = this.qwenMessages.scrollHeight;
-
-        try {
-            const model = this.qwenModelSelect.value;
-            const temperature = this.qwenTemperature.value;
-
-            const data = await this.apiManager.conversation({
-                message: currentMessage,
-                sessionId: this.sessionId,
-                model,
-                temperature: parseFloat(temperature)
-            });
-
-            // 移除加载状态
-            this.qwenMessages.removeChild(loadingDiv);
-
-            if (data.success) {
-                // 更新会话 ID
-                this.sessionId = data.sessionId;
-
-                // 添加 AI 响应
-                this.addMessage('ai', data.response);
-
-                // 更新 Token 统计
-                this.totalTokens += data.usage.total_tokens || 0;
-                this.qwenTokens.textContent = this.totalTokens;
-            } else {
-                this.addMessage('ai', `抱歉，出现错误：${data.error}`);
-            }
-
-        } catch (error) {
-            this.qwenMessages.removeChild(loadingDiv);
-            this.addMessage('ai', `抱歉，出现错误：${error.message}`);
-
-            // 如果是认证相关的错误，提示用户可能需要重新加载页面
-            if (error.message.includes('认证令牌') || error.message.includes('Token')) {
-                this.addMessage('ai', `💡 提示：如果问题持续，请尝试刷新页面重新连接。`);
-            }
-        }
+    
+    if (statusIndicator) {
+      statusIndicator.className = `status-indicator ${this.state.isConnected ? 'connected' : 'disconnected'}`;
+      statusIndicator.title = this.state.isConnected ? '已连接' : '未连接';
     }
+  }
+
+  /**
+   * 显示消息（成功或错误）
+   */
+  showMessage(message, type = 'info') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `notification notification-${type}`;
+    messageDiv.textContent = message;
+    
+    // 添加到页面
+    document.body.appendChild(messageDiv);
+    
+    // 3秒后自动移除
+    setTimeout(() => {
+      messageDiv.remove();
+    }, 3000);
+  }
+
+  /**
+   * 显示错误消息
+   */
+  showError(message) {
+    this.showMessage(message, 'error');
+    
+    // 发布错误事件
+    this.eventManager.publish('qwen:error', {
+      timestamp: Date.now(),
+      error: message
+    });
+  }
+
+  /**
+   * 显示验证错误
+   */
+  showValidationError(message) {
+    this.showMessage(message, 'warning');
+  }
+
+  /**
+   * 清空对话历史
+   */
+  async clearHistory() {
+    try {
+      this.messageManager.clearMessages();
+      await this.sessionManager.clearSession();
+      this.state.totalTokens = 0;
+      
+      // 更新token计数显示
+      const tokenCounter = document.getElementById('qwenTokens');
+      if (tokenCounter) {
+        tokenCounter.textContent = '0';
+      }
+      
+      console.log('✅ 对话历史已清空');
+      
+      // 添加欢迎消息
+      this.messageManager.addMessage('ai', '对话历史已清空，您可以开始新的对话。');
+      
+      // 发布历史清空事件
+      this.eventManager.publish('qwen:history:cleared', {
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('清空历史失败:', error);
+      this.showError(`清空历史失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 重新连接
+   */
+  async reconnect() {
+    console.log('尝试重新连接...');
+    await this.connect();
+  }
+
+  /**
+   * 销毁组件
+   */
+  destroy() {
+    // 清理事件监听器
+    const sendButton = document.getElementById('qwenSendBtn');
+    const inputArea = document.getElementById('qwenInput');
+    
+    if (sendButton) {
+      sendButton.removeEventListener('click', this.handleSendMessage);
+    }
+    
+    if (inputArea) {
+      inputArea.removeEventListener('keypress', this.handleSendMessage);
+    }
+    
+    // 清理定时器和异步操作
+    this.setState({ isLoading: false });
+    
+    console.log('Qwen AI 组件已销毁');
+    
+    // 发布销毁事件
+    this.eventManager.publish('qwen:destroyed', {
+      timestamp: Date.now()
+    });
+  }
 }
 
-// 初始化 Qwen AI 客户端
-let qwenAIInstance = null;
-
-export async function initializeQwenAI() {
-    if (!qwenAIInstance) {
-        qwenAIInstance = new QwenAI();
-        console.log('Qwen AI 客户端已初始化');
+// 自动初始化Qwen AI组件（如果页面中有相应元素）
+document.addEventListener('DOMContentLoaded', () => {
+  const qwenContainer = document.getElementById('qwenContainer');
+  if (qwenContainer) {
+    try {
+      // 检查是否已经初始化过
+      if (!window.qwenAIInstance) {
+        window.qwenAIInstance = new QwenAI();
+        console.log('Qwen AI 组件已自动初始化');
+      }
+    } catch (error) {
+      console.error('Qwen AI 组件初始化失败:', error);
     }
-    return qwenAIInstance;
-}
+  }
+});
 
-// 导出实例以便外部使用
-export { qwenAIInstance };
+// 导出类以供其他模块使用
+export default QwenAI;

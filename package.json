@@ -7,6 +7,7 @@
     "start": "node server/index.js",
     "dev": "nodemon server/index.js",
     "build": "node scripts/build.js",
+    "build:all": "node scripts/build-all.js",
     "docker:build": "docker build -t huangshi/api .",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
