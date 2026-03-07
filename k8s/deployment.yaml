@@ -1,144 +1,159 @@
-# k8s/namespace.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: huangshi-genealogy
 ---
-# k8s/configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: huangshi-config
-  namespace: huangshi-genealogy
-data:
-  NODE_ENV: "production"
-  PORT: "3000"
-  REDIS_URL: "redis://huangshi-redis:6379"
----
-# k8s/secrets.yaml (示例模板)
-apiVersion: v1
-kind: Secret
-metadata:
-  name: huangshi-secrets
-  namespace: huangshi-genealogy
-type: Opaque
-data:
-  # 注意：这些值应该是base64编码的
-  QWEN_API_KEY: <base64-encoded-value>
-  JWT_SECRET: <base64-encoded-value>
----
-# k8s/redis-deployment.yaml
+# ============================================
+# Deployment - 后端 API 服务
+# ============================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: huangshi-redis
-  namespace: huangshi-genealogy
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: huangshi-redis
-  template:
-    metadata:
-      labels:
-        app: huangshi-redis
-    spec:
-      containers:
-      - name: redis
-        image: redis:7-alpine
-        ports:
-        - containerPort: 6379
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "200m"
----
-# k8s/api-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: huangshi-api
-  namespace: huangshi-genealogy
+  name: hxfund-api
+  namespace: hxfund
+  labels:
+    app: huangshi-genealogy
+    component: api
+    version: "3.3.0"
 spec:
   replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
-      app: huangshi-api
+      app: huangshi-genealogy
+      component: api
   template:
     metadata:
       labels:
-        app: huangshi-api
+        app: huangshi-genealogy
+        component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
     spec:
+      serviceAccountName: hxfund-api
+      automountServiceAccountToken: false
       containers:
       - name: api
-        image: huangshi/api:latest
+        image: huangshi/api:3.3.0
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 3000
-        envFrom:
-        - configMapRef:
-            name: huangshi-config
-        - secretRef:
-            name: huangshi-secrets
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: hxfund-config
+              key: NODE_ENV
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: hxfund-config
+              key: PORT
+        - name: ALLOWED_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: hxfund-config
+              key: ALLOWED_ORIGINS
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: hxfund-config
+              key: LOG_LEVEL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: hxfund-config
+              key: REDIS_URL
+        - name: QWEN_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hxfund-secret
+              key: QWEN_API_KEY
+        - name: DASHSCOPE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hxfund-secret
+              key: DASHSCOPE_API_KEY
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: hxfund-secret
+              key: JWT_SECRET
+        - name: SERVER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: hxfund-secret
+              key: SERVER_API_KEY
         resources:
           requests:
             memory: "256Mi"
-            cpu: "200m"
+            cpu: "250m"
           limits:
             memory: "512Mi"
-            cpu: "400m"
+            cpu: "500m"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+        - name: config
+          mountPath: /app/server/config
+          readOnly: true
         livenessProbe:
           httpGet:
             path: /api/health
             port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /api/health
             port: 3000
           initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 0
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+      volumes:
+      - name: logs
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: hxfund-api-config
+          defaultMode: 0644
+      imagePullSecrets:
+      - name: docker-registry-secret
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
 ---
-# k8s/service.yaml
+# API 配置 ConfigMap
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: huangshi-api-service
-  namespace: huangshi-genealogy
-spec:
-  selector:
-    app: huangshi-api
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 3000
-  type: LoadBalancer
----
-# k8s/ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: huangshi-ingress
-  namespace: huangshi-genealogy
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-spec:
-  tls:
-  - hosts:
-    - api.hxfund.cn
-    secretName: huangshi-tls
-  rules:
-  - host: api.hxfund.cn
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: huangshi-api-service
-            port:
-              number: 80
+  name: hxfund-api-config
+  namespace: hxfund
+data:
+  auth.json.example: |
+    {
+      "serverApiKey": "${SERVER_API_KEY}",
+      "jwtSecret": "${JWT_SECRET}",
+      "tokenExpiresIn": 86400000,
+      "rateLimit": {
+        "windowMs": 60000,
+        "maxRequests": 30,
+        "maxChatRequests": 10
+      }
+    }
