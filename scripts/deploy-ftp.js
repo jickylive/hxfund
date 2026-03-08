@@ -29,7 +29,7 @@ if (!ftpConfig.host || !ftpConfig.user || !ftpConfig.password) {
 
 // 源目录和目标目录
 const SOURCE_DIR = path.join(__dirname, '..', 'dist');
-const TARGET_DIR = '/'; // FTP 根目录，可根据需要修改
+const TARGET_DIR = process.env.FTP_REMOTE || '/htdocs'; // 默认上传到 htdocs 目录
 
 if (!fs.existsSync(SOURCE_DIR)) {
     console.error(`❌ 源目录不存在: ${SOURCE_DIR}`);
