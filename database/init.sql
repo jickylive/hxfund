@@ -1,0 +1,371 @@
+-- ============================================
+-- 黄氏家族寻根平台 - 数据库初始化脚本
+-- 基于 public/js/data.js 数据建模
+-- 数据库：MySQL 8.0+
+-- 编码：utf8mb4
+-- ============================================
+
+-- 创建数据库
+CREATE DATABASE IF NOT EXISTS hxfund_db 
+DEFAULT CHARACTER SET utf8mb4 
+DEFAULT COLLATE utf8mb4_unicode_ci;
+
+USE hxfund_db;
+
+-- ============================================
+-- 1. 家族成员表 (family_members)
+-- ============================================
+DROP TABLE IF EXISTS `family_members`;
+
+CREATE TABLE `family_members` (
+  `id` VARCHAR(50) PRIMARY KEY COMMENT '成员 ID',
+  `parent_id` VARCHAR(50) DEFAULT NULL COMMENT '父成员 ID',
+  `name` VARCHAR(100) NOT NULL COMMENT '分支/支系名称',
+  `title` VARCHAR(100) NOT NULL COMMENT '人物称号/姓名',
+  `period` VARCHAR(100) COMMENT '历史时期',
+  `avatar` VARCHAR(10) COMMENT '头像 emoji',
+  `bio` TEXT COMMENT '人物简介',
+  `location` VARCHAR(200) COMMENT '地理位置',
+  `level` INT DEFAULT 0 COMMENT '树层级',
+  `sort_order` INT DEFAULT 0 COMMENT '排序顺序',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_parent_id` (`parent_id`),
+  INDEX `idx_level` (`level`),
+  FOREIGN KEY (`parent_id`) REFERENCES `family_members`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='家族成员表';
+
+-- ============================================
+-- 2. 字辈表 (generation_poems)
+-- ============================================
+DROP TABLE IF EXISTS `generation_poems`;
+
+CREATE TABLE `generation_poems` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `branch_code` VARCHAR(50) NOT NULL UNIQUE COMMENT '分支代码',
+  `branch_name` VARCHAR(100) NOT NULL COMMENT '分支名称',
+  `poem` VARCHAR(500) NOT NULL COMMENT '字辈诗全文',
+  `characters` VARCHAR(500) NOT NULL COMMENT '字辈字符序列',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_branch_code` (`branch_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='字辈表';
+
+-- ============================================
+-- 3. 项目愿景幻灯片表 (project_slides)
+-- ============================================
+DROP TABLE IF EXISTS `project_slides`;
+
+CREATE TABLE `project_slides` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `title` VARCHAR(100) NOT NULL COMMENT '标题',
+  `subtitle` VARCHAR(200) COMMENT '副标题',
+  `content` TEXT COMMENT '内容',
+  `icon` VARCHAR(10) COMMENT '图标 emoji',
+  `color` VARCHAR(20) COMMENT '主题色',
+  `tags` JSON COMMENT '标签数组',
+  `sort_order` INT DEFAULT 0 COMMENT '排序顺序',
+  `is_active` TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_sort` (`sort_order`),
+  INDEX `idx_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='项目愿景幻灯片表';
+
+-- ============================================
+-- 4. 区块链存证记录表 (blockchain_records)
+-- ============================================
+DROP TABLE IF EXISTS `blockchain_records`;
+
+CREATE TABLE `blockchain_records` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `record_id` VARCHAR(50) NOT NULL UNIQUE COMMENT '存证 ID',
+  `member_name` VARCHAR(100) NOT NULL COMMENT '成员姓名',
+  `hash_value` VARCHAR(100) NOT NULL COMMENT '哈希值',
+  `is_verified` TINYINT(1) DEFAULT 1 COMMENT '是否已验证',
+  `blockchain_tx` VARCHAR(200) COMMENT '区块链交易哈希',
+  `verified_at` TIMESTAMP NULL DEFAULT NULL COMMENT '验证时间',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_record_id` (`record_id`),
+  INDEX `idx_verified` (`is_verified`),
+  INDEX `idx_hash` (`hash_value`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='区块链存证记录表';
+
+-- ============================================
+-- 5. 留言表 (guest_messages)
+-- ============================================
+DROP TABLE IF EXISTS `guest_messages`;
+
+CREATE TABLE `guest_messages` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_name` VARCHAR(100) NOT NULL COMMENT '留言者姓名',
+  `content` TEXT NOT NULL COMMENT '留言内容',
+  `location` VARCHAR(200) COMMENT '地理位置',
+  `contact_info` VARCHAR(200) COMMENT '联系方式 (加密存储)',
+  `is_public` TINYINT(1) DEFAULT 1 COMMENT '是否公开显示',
+  `is_verified` TINYINT(1) DEFAULT 0 COMMENT '是否已审核',
+  `ip_address` VARCHAR(50) COMMENT 'IP 地址',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_public` (`is_public`),
+  INDEX `idx_verified` (`is_verified`),
+  INDEX `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='留言表';
+
+-- ============================================
+-- 6. 用户表 (users)
+-- ============================================
+DROP TABLE IF EXISTS `users`;
+
+CREATE TABLE `users` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `username` VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
+  `email` VARCHAR(100) COMMENT '邮箱',
+  `password_hash` VARCHAR(255) NOT NULL COMMENT '密码哈希',
+  `role` ENUM('admin', 'editor', 'user') DEFAULT 'user' COMMENT '角色',
+  `avatar` VARCHAR(255) COMMENT '头像 URL',
+  `branch_id` INT COMMENT '所属分支',
+  `generation` INT COMMENT '世代',
+  `location` VARCHAR(200) COMMENT '地理位置',
+  `is_active` TINYINT(1) DEFAULT 1 COMMENT '是否激活',
+  `last_login_at` TIMESTAMP NULL DEFAULT NULL COMMENT '最后登录时间',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_username` (`username`),
+  INDEX `idx_email` (`email`),
+  INDEX `idx_role` (`role`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+
+-- ============================================
+-- 7. 会话表 (sessions)
+-- ============================================
+DROP TABLE IF EXISTS `sessions`;
+
+CREATE TABLE `sessions` (
+  `id` VARCHAR(100) PRIMARY KEY COMMENT '会话 ID',
+  `user_id` INT DEFAULT NULL COMMENT '用户 ID',
+  `data` JSON NOT NULL COMMENT '会话数据',
+  `expires_at` TIMESTAMP NOT NULL COMMENT '过期时间',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_expires` (`expires_at`),
+  INDEX `idx_user_id` (`user_id`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会话表';
+
+-- ============================================
+-- 8. AI 对话记录表 (ai_conversations)
+-- ============================================
+DROP TABLE IF EXISTS `ai_conversations`;
+
+CREATE TABLE `ai_conversations` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `session_id` VARCHAR(100) NOT NULL COMMENT '会话 ID',
+  `user_id` INT DEFAULT NULL COMMENT '用户 ID',
+  `model` VARCHAR(50) COMMENT 'AI 模型',
+  `message` TEXT NOT NULL COMMENT '用户消息',
+  `response` TEXT NOT NULL COMMENT 'AI 响应',
+  `tokens_used` INT DEFAULT 0 COMMENT '消耗 Token 数',
+  `temperature` DECIMAL(3,2) DEFAULT 0.70 COMMENT '温度参数',
+  `image_url` VARCHAR(500) COMMENT '上传图片 URL',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_session` (`session_id`),
+  INDEX `idx_user` (`user_id`),
+  INDEX `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 对话记录表';
+
+-- ============================================
+-- 9. 系统配置表 (system_config)
+-- ============================================
+DROP TABLE IF EXISTS `system_config`;
+
+CREATE TABLE `system_config` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `config_key` VARCHAR(100) NOT NULL UNIQUE COMMENT '配置键',
+  `config_value` TEXT COMMENT '配置值',
+  `config_type` ENUM('string', 'number', 'boolean', 'json') DEFAULT 'string' COMMENT '配置类型',
+  `description` VARCHAR(500) COMMENT '配置说明',
+  `is_public` TINYINT(1) DEFAULT 0 COMMENT '是否公开',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_key` (`config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表';
+
+-- ============================================
+-- 数据初始化
+-- ============================================
+
+-- 1. 插入家族成员数据
+INSERT INTO `family_members` (`id`, `parent_id`, `name`, `title`, `period`, `avatar`, `bio`, `location`, `level`, `sort_order`) VALUES
+-- 始祖
+('ancestor', NULL, '黄姓始祖', '伯益', '上古时期', '👤', '黄姓得姓始祖', '中原地区', 0, 0),
+
+-- 第一层：三大支系
+('branch-1', 'ancestor', '江夏黄氏', '黄香', '东汉', '📚', '江夏黄氏代表人物，二十四孝之一', '湖北江夏', 1, 1),
+('branch-2', 'ancestor', '金华黄氏', '黄岸', '唐代', '📖', '唐代进士，金华黄氏始祖', '浙江金华', 1, 2),
+('branch-3', 'ancestor', '闽台黄氏', '黄敦', '唐代', '🏮', '唐代入闽始祖', '福建', 1, 3),
+
+-- 第二层：江夏支系
+('gen-1-1', 'branch-1', '江夏支系', '黄琼', '东汉', '🏛️', '东汉名臣，官至太尉', '湖北江夏', 2, 1),
+('gen-1-2', 'branch-1', '江夏支系', '黄琬', '东汉末年', '🎭', '东汉末年大臣', '湖北江夏', 2, 2),
+
+-- 第二层：金华支系
+('gen-2-1', 'branch-2', '金华支系', '黄峭', '五代十国', '🌾', '五代名臣，创办义门', '福建邵武', 2, 1),
+
+-- 第三层：邵武黄氏
+('gen-2-1-1', 'gen-2-1', '邵武黄氏', '黄维', '宋代', '✍️', '宋代文人', '福建邵武', 3, 1),
+
+-- 第二层：闽台支系
+('gen-3-1', 'branch-3', '闽台支系', '黄彦斌', '明代', '⚓', '明代航海家', '福建泉州', 2, 1);
+
+-- 2. 插入字辈数据
+INSERT INTO `generation_poems` (`branch_code`, `branch_name`, `poem`, `characters`) VALUES
+('jiangxia', '江夏黄氏', '文章华国诗礼传家忠孝为本仁义是先', '文章华国诗礼传家忠孝为本仁义是先'),
+('shicheng', '石城黄氏', '祖德流芳远宗功世泽长箕裘绵骏业俎豆永腾光', '祖德流芳远宗功世泽长箕裘绵骏业俎豆永腾光'),
+('mianyang', '绵阳黄氏', '朝廷文仕正世代永兴隆', '朝廷文仕正世代永兴隆'),
+('fujian', '福建黄氏', '敦厚垂型远诗书世泽长', '敦厚垂型远诗书世泽长');
+
+-- 3. 插入项目愿景幻灯片数据
+INSERT INTO `project_slides` (`title`, `subtitle`, `content`, `icon`, `color`, `tags`, `sort_order`) VALUES
+('愿景使命', '数字化传承黄氏家族文化，连接全球宗亲', '打造全球黄氏宗亲的数字化精神家园，让千年血脉在数字时代继续传承。通过现代科技手段，保护和弘扬黄氏家族的优秀传统文化。', '🎯', '#8B4513', '["文化传承", "数字化", "精神家园"]', 1),
+('核心功能', '六大模块全面服务宗亲', '族谱树 · 字辈计算器 · AI 助手 · 区块链存证 · 留言墙 · 项目展示', '⚙️', '#C8933A', '["族谱查询", "智能计算", "AI 对话", "区块链"]', 2),
+('技术架构', '现代化、可扩展的技术栈', 'Node.js + Express 后端 · 原生 JavaScript 前端 · 阿里云百炼 AI · JWT 认证体系 · 速率限制保护', '🏗️', '#c0392b', '["Node.js", "Express", "AI", "JWT"]', 3),
+('数据安全', '区块链存证，确保数据真实可信', '采用 SHA-256 哈希上链技术，确保族谱数据不可篡改、可溯源、永久保存。每一次修改都有迹可循，守护家族历史的真实性。', '🔗', '#27ae60', '["SHA-256", "不可篡改", "可溯源"]', 4),
+('未来规划', '持续迭代，打造更好的服务平台', '移动端 APP 开发 · 3D 族谱可视化 · AI 族谱智能修复 · 全球宗亲地图 · 线上线下活动联动', '🚀', '#2980b9', '["移动端", "3D 可视化", "AI 修复", "全球地图"]', 5);
+
+-- 4. 插入区块链存证记录数据
+INSERT INTO `blockchain_records` (`record_id`, `member_name`, `hash_value`, `is_verified`) VALUES
+('MBR-2024-001', '黄香', '0x7a8f9c3e2d1b5a4c6e8f0a2b4d6e8f0a2b4d6e8f', 1),
+('MBR-2024-002', '黄峭', '0x3b5d7f9a1c3e5g7i9k1m3o5q7s9u1w3y5a7c9e1g', 1),
+('MBR-2024-003', '黄岸', '0x9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d', 1);
+
+-- 5. 插入留言数据
+INSERT INTO `guest_messages` (`user_name`, `content`, `location`, `is_public`, `is_verified`) VALUES
+('黄志强', '寻找湖南宁乡黄氏宗亲，字辈为"光明正大"，望联系。', '湖南长沙', 1, 1),
+('黄文华', '感谢平台让我们这些海外游子能够了解家族历史！', '美国旧金山', 1, 1),
+('匿名宗亲', '福建邵武黄氏后裔，希望能找到同支系的宗亲。', '台湾台北', 1, 1);
+
+-- 6. 插入系统配置数据
+INSERT INTO `system_config` (`config_key`, `config_value`, `config_type`, `description`, `is_public`) VALUES
+('site_name', '黄氏家族寻根平台', 'string', '网站名称', 1),
+('site_version', '3.2.0', 'string', '系统版本号', 1),
+('allowed_origins', '["https://hxfund.cn","https://www.hxfund.cn"]', 'json', 'CORS 允许的源', 0),
+('rate_limit_window_ms', '60000', 'number', '速率限制窗口 (毫秒)', 0),
+('rate_limit_max_requests', '30', 'number', '速率限制最大请求数', 0),
+('session_retention_days', '30', 'number', '会话保留天数', 0),
+('ai_default_model', 'qwen3.5-plus', 'string', '默认 AI 模型', 0),
+('ai_temperature', '0.70', 'number', 'AI 温度参数', 0);
+
+-- ============================================
+-- 创建视图
+-- ============================================
+
+-- 家族成员完整信息视图
+CREATE OR REPLACE VIEW `v_family_members_full` AS
+SELECT 
+  m.id,
+  m.parent_id,
+  m.name,
+  m.title,
+  m.period,
+  m.avatar,
+  m.bio,
+  m.location,
+  m.level,
+  m.sort_order,
+  p.title AS parent_title,
+  CONCAT(REPEAT('  ', m.level), m.title) AS full_title
+FROM family_members m
+LEFT JOIN family_members p ON m.parent_id = p.id
+ORDER BY m.level, m.sort_order;
+
+-- 字辈完整信息视图
+CREATE OR REPLACE VIEW `v_generation_poems_full` AS
+SELECT 
+  branch_code,
+  branch_name,
+  poem,
+  characters,
+  CHAR_LENGTH(characters) AS total_generations,
+  SUBSTRING(characters, 1, 10) AS first_10_chars
+FROM generation_poems;
+
+-- ============================================
+-- 创建存储过程
+-- ============================================
+
+-- 获取某代字辈
+DELIMITER $$
+
+CREATE PROCEDURE `get_generation_character`(
+  IN p_branch_code VARCHAR(50),
+  IN p_generation INT
+)
+BEGIN
+  DECLARE v_characters VARCHAR(500);
+  DECLARE v_char_index INT;
+  DECLARE v_char VARCHAR(10);
+  
+  SELECT characters INTO v_characters
+  FROM generation_poems
+  WHERE branch_code = p_branch_code;
+  
+  IF v_characters IS NOT NULL THEN
+    SET v_char_index = MOD(p_generation - 1, CHAR_LENGTH(v_characters));
+    SET v_char = SUBSTRING(v_characters, v_char_index + 1, 1);
+    SELECT v_char AS generation_character;
+  ELSE
+    SELECT NULL AS generation_character;
+  END IF;
+END$$
+
+DELIMITER ;
+
+-- ============================================
+-- 创建触发器
+-- ============================================
+
+-- 家族成员插入时自动设置层级
+DELIMITER $$
+
+CREATE TRIGGER `tr_set_member_level`
+BEFORE INSERT ON `family_members`
+FOR EACH ROW
+BEGIN
+  DECLARE parent_level INT DEFAULT -1;
+  
+  IF NEW.parent_id IS NOT NULL THEN
+    SELECT level INTO parent_level
+    FROM family_members
+    WHERE id = NEW.parent_id;
+  END IF;
+  
+  IF parent_level >= 0 THEN
+    SET NEW.level = parent_level + 1;
+  ELSE
+    SET NEW.level = 0;
+  END IF;
+END$$
+
+DELIMITER ;
+
+-- ============================================
+-- 权限设置 (可选)
+-- ============================================
+
+-- 创建应用用户 (根据需要修改密码)
+-- CREATE USER IF NOT EXISTS 'hxfund_app'@'localhost' IDENTIFIED BY 'your_secure_password';
+-- GRANT SELECT, INSERT, UPDATE, DELETE ON hxfund_db.* TO 'hxfund_app'@'localhost';
+-- FLUSH PRIVILEGES;
+
+-- ============================================
+-- 完成提示
+-- ============================================
+
+SELECT '✅ 数据库初始化完成！' AS status;
+SELECT '数据库：hxfund_db' AS database_name;
+SELECT CONCAT('家族成员：', COUNT(*), ' 人') AS members FROM family_members;
+SELECT CONCAT('字辈分支：', COUNT(*), ' 个') AS branches FROM generation_poems;
+SELECT CONCAT('幻灯片：', COUNT(*), ' 个') AS slides FROM project_slides;
+SELECT CONCAT('存证记录：', COUNT(*), ' 条') AS records FROM blockchain_records;
+SELECT CONCAT('留言：', COUNT(*), ' 条') AS messages FROM guest_messages;
