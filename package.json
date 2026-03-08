@@ -19,6 +19,7 @@
     "deploy:aliyun:ftp": "node scripts/deploy-frontend-to-aliyun-ftp.js",
     "deploy:ftp": "node scripts/deploy-to-ftp.js",
     "deploy:docker": "bash scripts/deploy-docker.sh",
+    "save": "node scripts/save-progress.js",
     "qwen": "node qwen-code.js",
     "qwen:init": "node qwen-code.js --init",
     "test": "node tests/test-api.js && node tests/test-auth.js && node tests/test-chat.js",
