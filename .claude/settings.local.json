@@ -3,7 +3,24 @@
     "allow": [
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npm run build)",
+      "Bash(npm list terser)",
+      "Bash(npm install)",
+      "Bash(npm install web-vitals)",
+      "Bash(node -e \"import\\(''e:/website/hxfund/frontend/src/node_modules/web-vitals/dist/web-vitals.js''\\).then\\(m => console.log\\(Object.keys\\(m\\)\\)\\)\")",
+      "Bash(node -e \"import\\(''./node_modules/web-vitals/dist/web-vitals.js''\\).then\\(m => console.log\\(Object.keys\\(m.default || m\\)\\)\\)\")",
+      "Bash(npm run start)",
+      "Bash(REDIS_URL=memory npm start)",
+      "Bash(PORT=3001 REDIS_URL=memory npm start)",
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(curl -s http://localhost:3001/api/docs)",
+      "Bash(curl -s http://localhost:3001/)",
+      "Bash(curl -s http://localhost:3001/api/models)",
+      "Bash(python -m json.tool)"
+    ],
+    "additionalDirectories": [
+      "e:\\website\\hxfund\\public\\js"
     ]
   }
 }
