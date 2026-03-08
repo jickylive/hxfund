@@ -28,8 +28,8 @@
         // 生产环境：https://api.hxfund.cn
         // 开发环境：http://localhost:3000
         window.API_CONFIG = {
-            baseURL: window.location.hostname === 'localhost' 
-                ? 'http://localhost:3000' 
+            baseURL: window.location.hostname === 'localhost'
+                ? 'http://localhost:3000'
                 : 'https://api.hxfund.cn',
             timeout: 30000
         };
@@ -47,9 +47,10 @@
         *{margin:0;padding:0;box-sizing:border-box}html{scroll-behavior:smooth}body{font-family:'Noto Serif SC','STKaiti','KaiTi',serif;background:#f5f3e8;color:#2c1a0e;overflow-x:hidden;line-height:1.7}body{background-image:radial-gradient(circle at 20% 20%,rgba(200,147,58,0.04) 0%,transparent 50%),radial-gradient(circle at 80% 80%,rgba(139,69,19,0.04) 0%,transparent 50%)}.page-loader{position:fixed;inset:0;background:#2d1a0e;z-index:9999;display:flex;align-items:center;justify-content:center;transition:opacity .6s,visibility .6s}.page-loader.hidden{opacity:0;visibility:hidden}.loader-inner{text-align:center}.loader-char{font-size:5rem;color:#C8933A;animation:pulse 1.5s ease-in-out infinite}.loader-text{color:#fff8f0;margin-top:1rem;font-size:1rem;letter-spacing:4px;opacity:.7}@keyframes pulse{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.1);opacity:1}}.header{position:sticky;top:0;z-index:1000;background:#2d1a0e;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.2);height:64px;border-bottom:1px solid rgba(200,147,58,.2)}.header.scrolled{box-shadow:0 4px 24px rgba(0,0,0,.4);background-color:rgba(45,26,14,.97)}.header-content{display:flex;align-items:center;justify-content:space-between;height:64px;max-width:1200px;margin:0 auto;padding:0 24px;position:relative;z-index:1}.logo{display:flex;align-items:center;gap:10px;text-decoration:none;flex-shrink:0}.logo-icon{width:40px;height:40px;background:linear-gradient(135deg,#C8933A,#8B4513);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:900;color:#fff;box-shadow:0 2px 8px rgba(200,147,58,.4)}.logo-text{font-size:1.1rem;font-weight:700;letter-spacing:2px;color:#fff}.nav{display:flex;gap:4px;align-items:center}.nav-link{color:rgba(255,248,240,.75);text-decoration:none;padding:6px 14px;border-radius:6px;font-size:.9rem;letter-spacing:1px;transition:all .3s;position:relative}.nav-link:hover,.nav-link.active{color:#E8BF7A}.hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:4px;border:none;background:none}.hamburger span{width:24px;height:2px;background:#fff;border-radius:2px;transition:all .3s;display:block}.hero-section{margin-top:64px;min-height:calc(100vh - 64px);display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden;background:linear-gradient(160deg,#2d1a0e 0%,#3d2413 30%,#4a2c18 60%,#2d1a0e 100%)}.hero-content{position:relative;z-index:2;padding:60px 20px}.container{max-width:1200px;margin:0 auto;padding:0 24px;position:relative;z-index:1}@media(max-width:768px){.nav{display:none}.hamburger{display:flex}}@media(max-width:480px){.logo-text{display:none}.hero-title{font-size:2rem!important}}
     </style>
 
-    <!-- 非关键 CSS 异步加载 -->
-    <link rel="preload" href="/css/style.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="/css/style.css"></noscript>
+    <!-- 非关键 CSS 异步加载 -->
+    <noscript></noscript>
+  <script type="module" crossorigin src="./js/main.Bg4PSnxa.js"></script>
+  <link rel="stylesheet" crossorigin href="./css/main.CIYGb4Pp.css">
 </head>
 
 <body>
@@ -475,12 +476,8 @@
     <button id="backToTop" class="back-to-top" aria-label="回到顶部">↑</button>
 
     <!-- ============================================
-         脚本文件：defer 异步加载，数据优先
-    ============================================= -->
-    <script src="/js/error-monitor.js" defer></script>
-    <script src="/js/data.js" defer></script>
-    <script src="/js/main.js" defer></script>
-    <script src="/js/modules.js" defer></script>
-    <script src="/js/script.js" defer></script>
+         脚本文件：模块化加载
+    ============================================= -->
+    <!-- Web Vitals 监控 -->
 </body>
 </html>

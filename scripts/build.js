@@ -2,17 +2,20 @@
  * 黄氏家族寻根平台 - 构建脚本
  *
  * 功能：
- * 1. 复制静态资源到 dist 目录
- * 2. 使用 terser 压缩 JS 文件
- * 3. 使用 cssnano 压缩 CSS 文件
- * 4. 生成 CDN 优化版本的 HTML
- * 5. 生成资源清单
- * 6. 备份会话数据（压缩格式）
+ * 1. 构建 Vite 前端资源
+ * 2. 复制静态资源到 dist 目录
+ * 3. 使用 terser 压缩 JS 文件
+ * 4. 使用 cssnano 压缩 CSS 文件
+ * 5. 生成 CDN 优化版本的 HTML
+ * 6. 生成资源清单
+ * 7. 备份会话数据（压缩格式）
+ * 8. 构建 Hexo 博客到 dist/blog 目录
  */
 
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { execSync } = require('child_process');
 
 // Dynamically require terser only when needed
 let terser = null;
@@ -298,6 +301,74 @@ async function backupSessionData() {
     }
 }
 
+// 构建 Vite 前端
+async function buildFrontend() {
+    console.log('\n╔═══════════════════════════════════════════════════════════╗');
+    console.log('║     构建 Vite 前端 (frontend/src)                         ║');
+    console.log('╚═══════════════════════════════════════════════════════════╝\n');
+
+    const FRONTEND_DIR = path.join(__dirname, '..', 'frontend', 'src');
+    const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
+
+    if (!fs.existsSync(path.join(FRONTEND_DIR, 'package.json'))) {
+        console.log('  ℹ️  frontend/src 目录不存在，跳过前端构建');
+        return;
+    }
+
+    try {
+        console.log('🔨 安装前端依赖...');
+        execSync('npm install', {
+            cwd: FRONTEND_DIR,
+            stdio: 'inherit'
+        });
+
+        console.log('🔨 构建 Vite 前端...');
+        execSync('npm run build', {
+            cwd: FRONTEND_DIR,
+            stdio: 'inherit'
+        });
+
+        console.log('✅ 前端构建完成');
+
+        // 复制前端构建产物到 dist/
+        if (fs.existsSync(frontendDist)) {
+            console.log('📁 复制前端构建产物到 dist/...');
+            copyDir(frontendDist, path.join(__dirname, '..', 'dist'));
+        }
+
+    } catch (error) {
+        console.error('❌ 前端构建失败:', error.message);
+        console.log('⚠️  继续构建其他部分...');
+    }
+}
+
+// 构建 Hexo 博客
+async function buildBlog() {
+    console.log('\n╔═══════════════════════════════════════════════════════════╗');
+    console.log('║     构建 Hexo 博客 (dist/blog)                            ║');
+    console.log('╚═══════════════════════════════════════════════════════════╝\n');
+
+    const BLOG_DIR = path.join(__dirname, '..', 'blog');
+    const blogBuildScript = path.join(BLOG_DIR, 'build-to-dist.js');
+
+    if (!fs.existsSync(blogBuildScript)) {
+        console.log('  ℹ️  博客构建脚本不存在，跳过博客构建');
+        return;
+    }
+
+    try {
+        console.log('🔨 构建 Hexo 博客...');
+        execSync(`node "${blogBuildScript}"`, {
+            cwd: BLOG_DIR,
+            stdio: 'inherit'
+        });
+        console.log('✅ 博客构建完成');
+    } catch (error) {
+        console.error('❌ 博客构建失败:', error.message);
+        console.log('⚠️  继续主项目构建...');
+    }
+}
+
 // 主函数
 async function build() {
     console.log('╔═══════════════════════════════════════════════════════════╗');
@@ -307,13 +378,31 @@ async function build() {
     // 定义目录路径
     const DIST_DIR = path.join(__dirname, '..', 'dist');
     const PUBLIC_DIR = path.join(__dirname, '..', 'public');
-    
+
     // 清理并创建目录
     console.log('📁 创建目录结构...');
     if (fs.existsSync(DIST_DIR)) {
+        // 保留 blog 目录，只清理其他内容
+        const blogDir = path.join(DIST_DIR, 'blog');
+        const blogExists = fs.existsSync(blogDir);
+        let blogFiles = [];
+        
+        if (blogExists) {
+            // 保存 blog 目录内容
+            blogFiles = fs.readdirSync(blogDir);
+        }
+        
         fs.rmSync(DIST_DIR, { recursive: true });
+        fs.mkdirSync(DIST_DIR, { recursive: true });
+        
+        // 恢复 blog 目录（如果有）
+        if (blogExists) {
+            fs.mkdirSync(blogDir, { recursive: true });
+        }
+    } else {
+        fs.mkdirSync(DIST_DIR, { recursive: true });
     }
-    ensureDir(DIST_DIR);
+    
     ensureDir(path.join(DIST_DIR, 'css'));
     ensureDir(path.join(DIST_DIR, 'js'));
     ensureDir(path.join(DIST_DIR, 'images'));
@@ -321,6 +410,9 @@ async function build() {
     console.log('  ✓ dist/css/');
     console.log('  ✓ dist/js/');
     console.log('  ✓ dist/images/');
+
+    // 构建 Vite 前端
+    await buildFrontend();
 
     // 复制图片等静态资源
     console.log('\n📁 复制静态资源...');
@@ -354,6 +446,9 @@ async function build() {
     // 备份会话数据
     await backupSessionData();
 
+    // 构建 Hexo 博客
+    await buildBlog();
+
     // 输出摘要
     console.log('\n╔═══════════════════════════════════════════════════════════╗');
     console.log('║                    构建完成                               ║');
@@ -363,6 +458,7 @@ async function build() {
     console.log(`║  HTML: ${(htmlSize / 1024).toFixed(2)} KB`);
     console.log('╠═══════════════════════════════════════════════════════════╣');
     console.log('║  输出目录：dist/                                          ║');
+    console.log('║  博客目录：dist/blog/                                     ║');
     console.log('║  部署说明：将 dist/ 目录内容上传到 CDN 或静态主机           ║');
     console.log('╚═══════════════════════════════════════════════════════════╝\n');
 }

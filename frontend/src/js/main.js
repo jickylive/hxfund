@@ -9,6 +9,9 @@ import { setupBackToTop } from '../utils/back-to-top.js';
 import { setupAnimations } from '../utils/animations.js';
 import { initializeQwenAI } from '../components/qwen-ai.js';
 
+// 导入并执行 Web Vitals 监控
+import '../js/web-vitals.js';
+
 // 页面加载完成后隐藏加载动画
 window.addEventListener('load', () => {
     const pageLoader = document.getElementById('pageLoader');

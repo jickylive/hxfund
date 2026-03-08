@@ -54,5 +54,8 @@
   "bugs": {
     "url": "https://github.com/huangshi-genealogy/hxfund.cn/issues"
   },
-  "homepage": "https://hxfund.cn"
+  "homepage": "https://hxfund.cn",
+  "dependencies": {
+    "web-vitals": "^5.1.0"
+  }
 }
