@@ -29,9 +29,9 @@ async function initializeDatabase() {
     process.exit(1);
   }
 
-  if (!process.env.RDS_DATABASE || process.env.RDS_DATABASE === 'hxfund_db') {
+  if (!process.env.RDS_DATABASE || process.env.RDS_DATABASE === 'hxfund') {
     console.error('❌ 错误：请先在 .env 文件中配置 RDS_DATABASE');
-    console.error('   或者先在 RDS 控制台创建数据库 hxfund_db');
+    console.error('   或者先在 RDS 控制台创建数据库 hxfund');
     process.exit(1);
   }
 
@@ -183,13 +183,13 @@ async function initializeDatabase() {
       console.error('   3. 确保用户有该数据库的权限');
       console.error('');
       console.error('   在 RDS 控制台执行:');
-      console.error(`   CREATE DATABASE \`${process.env.RDS_DATABASE || 'hxfund_db'}\` DEFAULT CHARACTER SET utf8mb4;`);
-      console.error(`   GRANT ALL PRIVILEGES ON \`${process.env.RDS_DATABASE || 'hxfund_db'}\`.* TO '${process.env.RDS_USERNAME || 'hxfund'}'@'%';`);
+      console.error(`   CREATE DATABASE \`${process.env.RDS_DATABASE || 'hxfund'}\` DEFAULT CHARACTER SET utf8mb4;`);
+      console.error(`   GRANT ALL PRIVILEGES ON \`${process.env.RDS_DATABASE || 'hxfund'}\`.* TO '${process.env.RDS_USERNAME || 'hxfund'}'@'%';`);
       console.error('   FLUSH PRIVILEGES;');
     } else if (error.code === 'ER_BAD_DB_ERROR') {
       console.error('\n💡 提示：数据库不存在');
       console.error('   请先在阿里云 RDS 控制台创建数据库');
-      console.error(`   数据库名称：${process.env.RDS_DATABASE || 'hxfund_db'}`);
+      console.error(`   数据库名称：${process.env.RDS_DATABASE || 'hxfund'}`);
     } else if (error.code === 'ETIMEDOUT') {
       console.error('\n💡 提示：连接超时');
       console.error('   1. 检查 RDS 实例是否运行中');

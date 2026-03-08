@@ -5,11 +5,11 @@
 -- ============================================
 
 -- 创建数据库
-CREATE DATABASE IF NOT EXISTS hxfund_db 
+CREATE DATABASE IF NOT EXISTS `hxfund` 
 DEFAULT CHARACTER SET utf8mb4 
 DEFAULT COLLATE utf8mb4_unicode_ci;
 
-USE hxfund_db;
+USE `hxfund`;
 
 -- ============================================
 -- 1. 家族成员表
@@ -181,7 +181,7 @@ INSERT INTO `system_config` (`config_key`, `config_value`, `config_type`, `descr
 -- ============================================
 
 SELECT '✅ 数据库初始化完成！' AS status;
-SELECT '数据库：hxfund_db' AS database_name;
+SELECT '数据库：hxfund' AS database_name;
 SELECT CONCAT('家族成员：', COUNT(*), ' 人') AS members FROM family_members;
 SELECT CONCAT('字辈分支：', COUNT(*), ' 个') AS branches FROM generation_poems;
 SELECT CONCAT('幻灯片：', COUNT(*), ' 个') AS slides FROM project_slides;

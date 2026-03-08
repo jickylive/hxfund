@@ -16,7 +16,7 @@
 4. 左侧菜单选择 **数据库管理**
 5. 点击 **创建数据库**
 6. 填写信息：
-   - **数据库名称**: `hxfund_db`
+   - **数据库名称**: `hxfund`
    - **字符集**: `utf8mb4`
    - **初始账号**: 选择 `hxfund`
    - **权限**: `读写`
@@ -32,7 +32,7 @@
 
 ```sql
 -- 创建数据库
-CREATE DATABASE IF NOT EXISTS `hxfund_db` 
+CREATE DATABASE IF NOT EXISTS `hxfund` 
 DEFAULT CHARACTER SET utf8mb4 
 DEFAULT COLLATE utf8mb4_unicode_ci;
 
