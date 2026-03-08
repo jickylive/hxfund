@@ -48,6 +48,12 @@ const sessionStore = require('./session-store');
 // 引入 Waline 评论系统
 const walineRouter = require('./waline');
 
+// 引入数据库路由
+const databaseRouter = require('./routes/database');
+
+// 引入数据库连接管理器
+const dbManager = require('./config/db-manager');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -154,6 +160,13 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Waline API 路由（兼容 Waline 前端调用）
 app.use('/api/waline', walineRouter);
+
+// ============================================
+// 数据库 API（RDS）
+// ============================================
+
+// 数据库 API 路由
+app.use('/api/db', databaseRouter);
 
 // ============================================
 // 配置与常量
@@ -1000,13 +1013,23 @@ async function chat(message) {
 // 启动服务器
 // ============================================
 
-app.listen(PORT, () => {
-  const cliConfigured = isCliConfigured();
-  const cliConfig = getCliConfig();
+async function startServer() {
+  try {
+    // 初始化数据库连接
+    if (process.env.RDS_HOST && process.env.RDS_HOST !== 'your-rds-instance.mysql.rds.aliyuncs.com') {
+      console.log('🔌 正在初始化数据库连接...');
+      await dbManager.initialize();
+    } else {
+      console.log('⚠️  未配置 RDS，跳过数据库初始化');
+    }
 
-  console.log(`
+    app.listen(PORT, () => {
+      const cliConfigured = isCliConfigured();
+      const cliConfig = getCliConfig();
+
+      console.log(`
 ╔═══════════════════════════════════════════════════════════╗
-║   黄氏家族寻根平台 - API 服务 (CLI + Waline)               ║
+║   黄氏家族寻根平台 - API 服务 (CLI + Waline + RDS)         ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  运行地址：http://localhost:${PORT}                         ║
 ║  API 文档：http://localhost:${PORT}/api/docs                ║
@@ -1018,17 +1041,20 @@ app.listen(PORT, () => {
 ║    DELETE /api/session/:id - 删除会话                     ║
 ║    GET  /api/models        - 模型列表                     ║
 ╠═══════════════════════════════════════════════════════════╣
+║  数据库 API 端点 (RDS):                                     ║
+║    GET  /api/db/health             - 数据库健康检查        ║
+║    GET  /api/db/family-tree        - 获取家族树            ║
+║    GET  /api/db/generation-poems   - 获取字辈诗            ║
+║    GET  /api/db/project-slides     - 获取项目幻灯片        ║
+║    GET  /api/db/blockchain-records - 获取区块链存证        ║
+║    GET  /api/db/guest-messages     - 获取留言              ║
+║    POST /api/db/guest-messages     - 提交留言              ║
+╠═══════════════════════════════════════════════════════════╣
 ║  Waline 评论 API 端点：                                     ║
 ║    GET    /api/waline/article     - 获取文章统计          ║
 ║    POST   /api/waline/article     - 更新文章统计          ║
 ║    GET    /api/waline/comment     - 获取评论列表          ║
 ║    POST   /api/waline/comment     - 添加评论              ║
-║    DELETE /api/waline/comment/:id - 删除评论              ║
-║    PUT    /api/waline/comment/:id - 更新评论              ║
-║    POST   /api/waline/comment/:id/like - 点赞评论         ║
-║    GET    /api/waline/user        - 用户列表              ║
-║    GET    /api/waline/system      - 系统信息              ║
-║    GET    /api/waline/health      - 健康检查              ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  其他 API 端点：                                           ║
 ║    GET  /api/health        - 健康检查                     ║
@@ -1043,18 +1069,41 @@ app.listen(PORT, () => {
 ╚═══════════════════════════════════════════════════════════╝
   `);
 
-  if (!cliConfigured) {
-    console.log('⚠️  警告：CLI 未配置 API Key，请先运行 node qwen-code.js --init\n');
+      if (!cliConfigured) {
+        console.log('⚠️  警告：CLI 未配置 API Key，请先运行 node qwen-code.js --init\n');
+      }
+    });
+  } catch (error) {
+    console.error('❌ 服务器启动失败:', error.message);
+    process.exit(1);
   }
-});
+}
+
+startServer();
 
 // 优雅关闭
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('收到 SIGTERM 信号，正在关闭...');
+  try {
+    await dbManager.close();
+    console.log('✅ 数据库连接已关闭');
+  } catch (error) {
+    console.error('❌ 关闭数据库连接失败:', error.message);
+  }
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('收到 SIGINT 信号，正在关闭...');
+  try {
+    await dbManager.close();
+    console.log('✅ 数据库连接已关闭');
+  } catch (error) {
+    console.error('❌ 关闭数据库连接失败:', error.message);
+  }
   process.exit(0);
+});
+
+process.on('exit', () => {
+  console.log('👋 服务已退出');
 });
