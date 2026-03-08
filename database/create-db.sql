@@ -4,16 +4,16 @@
 -- ============================================
 
 -- 1. 创建数据库
-CREATE DATABASE IF NOT EXISTS `hxfund_db` 
+CREATE DATABASE IF NOT EXISTS `hxfund` 
 DEFAULT CHARACTER SET utf8mb4 
 DEFAULT COLLATE utf8mb4_unicode_ci;
 
 -- 2. 授权用户访问（如果需要）
--- GRANT ALL PRIVILEGES ON `hxfund_db`.* TO 'hxfund'@'%';
+-- GRANT ALL PRIVILEGES ON `hxfund`.* TO 'hxfund'@'%';
 -- FLUSH PRIVILEGES;
 
 -- 3. 使用数据库
-USE `hxfund_db`;
+USE `hxfund`;
 
 -- 4. 创建家族成员表
 CREATE TABLE IF NOT EXISTS `family_members` (

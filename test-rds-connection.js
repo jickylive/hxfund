@@ -35,7 +35,7 @@ async function testRDSConnection() {
   try {
     console.log('📋 连接配置:');
     console.log(`   主机：${process.env.RDS_HOST}:${process.env.RDS_PORT || 3306}`);
-    console.log(`   数据库：${process.env.RDS_DATABASE || 'hxfund_db'}`);
+    console.log(`   数据库：${process.env.RDS_DATABASE || 'hxfund'}`);
     console.log(`   用户：${process.env.RDS_USERNAME}`);
     console.log(`   SSL: ${process.env.RDS_SSL === 'true' ? '已启用' : '未启用'}`);
     console.log('');
@@ -47,7 +47,7 @@ async function testRDSConnection() {
       port: parseInt(process.env.RDS_PORT) || 3306,
       user: process.env.RDS_USERNAME,
       password: process.env.RDS_PASSWORD,
-      database: process.env.RDS_DATABASE || 'hxfund_db',
+      database: process.env.RDS_DATABASE || 'hxfund',
       charset: process.env.RDS_CHARSET || 'utf8mb4',
       connectTimeout: parseInt(process.env.RDS_CONNECT_TIMEOUT) || 10000,
       ssl: process.env.RDS_SSL === 'true' ? {
