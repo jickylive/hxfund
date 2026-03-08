@@ -29,7 +29,7 @@ async function initializeDatabase() {
     process.exit(1);
   }
 
-  if (!process.env.RDS_DATABASE || process.env.RDS_DATABASE === 'hxfund') {
+  if (!process.env.RDS_DATABASE || process.env.RDS_DATABASE === 'your_database_name') {
     console.error('❌ 错误：请先在 .env 文件中配置 RDS_DATABASE');
     console.error('   或者先在 RDS 控制台创建数据库 hxfund');
     process.exit(1);
