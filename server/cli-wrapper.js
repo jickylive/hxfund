@@ -18,15 +18,26 @@ const CONFIG_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.qwe
 function loadCliConfig() {
   try {
     // 优先从环境变量读取配置
-    if (process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY) {
-      return {
-        apiKey: process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY,
-        baseURL: process.env.QWEN_BASE_URL || process.env.DASHSCOPE_BASE_URL || 'https://coding.dashscope.aliyuncs.com/v1',
-        model: process.env.QWEN_MODEL || 'qwen3.5-plus',
-        temperature: parseFloat(process.env.QWEN_TEMPERATURE) || 0.7
-      };
+    if (process.env.GITCODE_API_KEY || process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY) {
+      // 如果是GitCode配置，则使用GitCode的参数
+      if (process.env.GITCODE_API_KEY) {
+        return {
+          apiKey: process.env.GITCODE_API_KEY,
+          baseURL: process.env.GITCODE_BASE_URL || 'https://api-ai.gitcode.com/v1',
+          model: process.env.GITCODE_MODEL || 'Qwen/Qwen3.5-397B-A17B',
+          temperature: parseFloat(process.env.GITCODE_TEMPERATURE) || 0.7
+        };
+      } else {
+        // 否则使用原有的Qwen/DashScope配置
+        return {
+          apiKey: process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY,
+          baseURL: process.env.QWEN_BASE_URL || process.env.DASHSCOPE_BASE_URL || 'https://coding.dashscope.aliyuncs.com/v1',
+          model: process.env.QWEN_MODEL || 'qwen3.5-plus',
+          temperature: parseFloat(process.env.QWEN_TEMPERATURE) || 0.7
+        };
+      }
     }
-    
+
     // 否则从配置文件读取
     if (fs.existsSync(CONFIG_FILE)) {
       return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
@@ -65,6 +76,10 @@ async function callQwenCli(prompt, options = {}) {
   // 创建包含API密钥的环境变量
   const env = {
     ...process.env,
+    ...(process.env.GITCODE_API_KEY ? { GITCODE_API_KEY: process.env.GITCODE_API_KEY } : {}),
+    ...(process.env.GITCODE_BASE_URL ? { GITCODE_BASE_URL: process.env.GITCODE_BASE_URL } : {}),
+    ...(process.env.GITCODE_MODEL ? { GITCODE_MODEL: process.env.GITCODE_MODEL } : {}),
+    ...(process.env.GITCODE_TEMPERATURE ? { GITCODE_TEMPERATURE: process.env.GITCODE_TEMPERATURE } : {}),
     ...(process.env.QWEN_API_KEY ? { QWEN_API_KEY: process.env.QWEN_API_KEY } : {}),
     ...(process.env.DASHSCOPE_API_KEY ? { DASHSCOPE_API_KEY: process.env.DASHSCOPE_API_KEY } : {}),
     ...(process.env.QWEN_BASE_URL ? { QWEN_BASE_URL: process.env.QWEN_BASE_URL } : {}),
@@ -162,10 +177,25 @@ function callQwenCliSync(prompt, options = {}) {
   args.push(prompt);
   
   try {
+    const env = {
+      ...process.env,
+      ...(process.env.GITCODE_API_KEY ? { GITCODE_API_KEY: process.env.GITCODE_API_KEY } : {}),
+      ...(process.env.GITCODE_BASE_URL ? { GITCODE_BASE_URL: process.env.GITCODE_BASE_URL } : {}),
+      ...(process.env.GITCODE_MODEL ? { GITCODE_MODEL: process.env.GITCODE_MODEL } : {}),
+      ...(process.env.GITCODE_TEMPERATURE ? { GITCODE_TEMPERATURE: process.env.GITCODE_TEMPERATURE } : {}),
+      ...(process.env.QWEN_API_KEY ? { QWEN_API_KEY: process.env.QWEN_API_KEY } : {}),
+      ...(process.env.DASHSCOPE_API_KEY ? { DASHSCOPE_API_KEY: process.env.DASHSCOPE_API_KEY } : {}),
+      ...(process.env.QWEN_BASE_URL ? { QWEN_BASE_URL: process.env.QWEN_BASE_URL } : {}),
+      ...(process.env.DASHSCOPE_BASE_URL ? { DASHSCOPE_BASE_URL: process.env.DASHSCOPE_BASE_URL } : {}),
+      ...(process.env.QWEN_MODEL ? { QWEN_MODEL: process.env.QWEN_MODEL } : {}),
+      ...(process.env.QWEN_TEMPERATURE ? { QWEN_TEMPERATURE: process.env.QWEN_TEMPERATURE } : {})
+    };
+
     const output = execSync(`node ${args.join(' ')}`, {
       encoding: 'utf-8',
       timeout: 60000,
-      maxBuffer: 10 * 1024 * 1024 // 10MB
+      maxBuffer: 10 * 1024 * 1024, // 10MB
+      env: env
     });
     
     const aiMatch = output.match(/🤖 AI:([\s\S]*?)(?:\n📊|$)/);

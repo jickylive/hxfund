@@ -3,8 +3,8 @@
  * 提供家族成员、字辈、留言等数据访问
  */
 
-import express from 'express';
-import dbManager from '../config/db-manager.js';
+const express = require('express');
+const dbManager = require('../config/db-manager');
 
 const router = express.Router();
 
@@ -276,17 +276,25 @@ router.get('/guest-messages', async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
-    
+
+    // Validate inputs to prevent SQL injection
+    if (isNaN(limit) || isNaN(offset) || limit < 1 || limit > 100 || offset < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid page or limit parameters'
+      });
+    }
+
     const sql = `
       SELECT id, user_name, content, location, created_at
       FROM guest_messages
       WHERE is_public = 1 AND is_verified = 1
       ORDER BY created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${parseInt(limit, 10)} OFFSET ${parseInt(offset, 10)}
     `;
-    
-    const messages = await dbManager.query(sql, [limit, offset]);
-    
+
+    const messages = await dbManager.query(sql);
+
     // 获取总数
     const countSql = `
       SELECT COUNT(*) as total
@@ -295,7 +303,7 @@ router.get('/guest-messages', async (req, res) => {
     `;
     const countResult = await dbManager.query(countSql);
     const total = countResult[0].total;
-    
+
     res.json({
       success: true,
       data: messages,
@@ -307,6 +315,7 @@ router.get('/guest-messages', async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('获取留言列表失败:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -393,4 +402,4 @@ function buildFamilyTree(members) {
   return rootMembers[0] || null;
 }
 
-export default router;
+module.exports = router;

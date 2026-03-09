@@ -1,24 +1,26 @@
 #!/usr/bin/env node
 /**
- * 黄氏家族寻根平台 - Qwen Code CLI 工具（增强版）
- * 
+ * 黄氏家族寻根平台 - Qwen Code CLI 工具（增强版 + Git 集成）
+ *
  * 基于阿里云百炼 Coding Plan 套餐
  * 使用方式：交互式编程助手（符合 Coding Plan 使用限制）
- * 
+ *
  * 功能特性：
  * - 支持 Qwen Code、Claude Code、Cline、OpenCode 等多种 AI 工具配置
  * - 一键初始化配置
  * - 交互式对话
  * - 模型切换
- * 
+ * - Git 日志分析功能
+ *
  * 使用方法：
  *   node qwen-code.js [问题]
  *   node qwen-code.js --help
  *   node qwen-code.js --init
- * 
+ *
  * 示例：
  *   node qwen-code.js "黄姓的起源是什么？"
  *   node qwen-code.js --init  # 初始化配置
+ *   node qwen-code.js --git-analyze  # AI 分析 Git 历史
  */
 
 const https = require('https');
@@ -36,10 +38,10 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const QWEN_SETTINGS_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.qwen', 'settings.json');
 
 const DEFAULT_CONFIG = {
-  apiKey: '',
-  baseURL: 'https://coding.dashscope.aliyuncs.com/v1',
-  model: 'qwen3.5-plus',
-  temperature: 0.7,
+  apiKey: process.env.GITCODE_API_KEY || process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY || '',
+  baseURL: process.env.GITCODE_BASE_URL || process.env.QWEN_BASE_URL || process.env.DASHSCOPE_BASE_URL || 'https://coding.dashscope.aliyuncs.com/v1',
+  model: process.env.GITCODE_MODEL || process.env.QWEN_MODEL || 'qwen3.5-plus',
+  temperature: parseFloat(process.env.GITCODE_TEMPERATURE || process.env.QWEN_TEMPERATURE || '0.7'),
   systemPrompt: '你是黄氏家族寻根助手，由通义千问提供技术支持。你专注于：\n1. 解答黄姓起源、历史和文化\n2. 帮助查询族谱和字辈信息\n3. 提供寻根问祖相关咨询\n4. 传承和弘扬黄氏家族传统美德\n\n作为编程助手，你也擅长解答代码相关问题。'
 };
 
@@ -52,6 +54,7 @@ const SUPPORTED_MODELS = [
   { id: 'glm-5', name: 'GLM-5', thinking: true, default: false },
   { id: 'glm-4.7', name: 'GLM-4.7', thinking: true, default: false },
   { id: 'kimi-k2.5', name: 'Kimi K2.5', thinking: true, default: false },
+  { id: 'Qwen/Qwen3.5-397B-A17B', name: 'Qwen3.5-397B-A17B (GitCode)', default: false },
 ];
 
 // AI 工具配置模板
@@ -449,10 +452,15 @@ function callQwenAPI(config, prompt, conversationHistory = []) {
 
     const data = JSON.stringify(requestBody);
 
+    // 根据baseURL确定hostname
+    const isGitCode = config.baseURL.includes('api-ai.gitcode.com');
+    const hostname = isGitCode ? 'api-ai.gitcode.com' : 'coding.dashscope.aliyuncs.com';
+    const path = urlPath.replace(isGitCode ? 'https://api-ai.gitcode.com' : 'https://coding.dashscope.aliyuncs.com', '');
+
     const options = {
-      hostname: 'coding.dashscope.aliyuncs.com',
+      hostname: hostname,
       port: 443,
-      path: urlPath.replace('https://coding.dashscope.aliyuncs.com', ''),
+      path: path,
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${config.apiKey}`,

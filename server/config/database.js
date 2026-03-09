@@ -23,6 +23,7 @@ const mysqlConfig = {
   // 如果 RDS 不支持 SSL，设置 RDS_SSL=false
   ssl: process.env.RDS_SSL === 'true' ? {
     rejectUnauthorized: false, // 允许自签名证书
+    ...(process.env.MYSQL_SSL_CA_PATH ? { ca: require('fs').readFileSync(process.env.MYSQL_SSL_CA_PATH) } : {})
   } : false,
 };
 
