@@ -29,6 +29,25 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config({ path: path.join(__dirname, 'config', '.env') });
 
+// 引入统一日志管理
+const logger = require('./config/logger');
+const httpLogger = require('./middleware/http-logger');
+
+// 引入统一错误处理
+const { errorHandler, notFoundHandler, asyncHandler } = require('./middleware/errorHandler');
+
+// 引入安全中间件
+const { 
+  requestId, 
+  securityHeaders, 
+  logSanitizer,
+  userAgentValidator,
+  enhancedRateLimit 
+} = require('./middleware/security');
+
+// 引入性能监控
+const { performanceMiddleware, setupMonitoringRoutes } = require('./config/monitoring');
+
 // 引入 CLI 封装模块 - 统一调用入口
 const { callQwenCli, isCliConfigured, getCliConfig, CLI_PATH } = require('./cli-wrapper');
 
@@ -64,6 +83,18 @@ setupExpressIntegration(app);
 // 安全中间件
 // ============================================
 
+// 请求 ID 生成
+app.use(requestId);
+
+// 日志脱敏
+app.use(logSanitizer);
+
+// 安全头增强
+app.use(securityHeaders);
+
+// 用户代理验证
+app.use(userAgentValidator);
+
 // 压缩响应
 app.use(compression());
 
@@ -88,13 +119,12 @@ app.use(helmet({
   }
 }));
 
-// 速率限制
-const limiter = rateLimit({
+// 增强速率限制（IP + 用户双重限制）
+const limiter = enhancedRateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
-  max: 100, // 限制每个IP 15分钟内最多100个请求
-  message: '请求过于频繁，请稍后再试',
-  standardHeaders: true, // 返回速率限制信息
-  legacyHeaders: false, // 不使用x-rate-limit头
+  maxRequests: 100, // 每个IP最多100次请求
+  maxRequestsPerUser: 30, // 每个用户最多30次请求
+  skipSuccessfulRequests: false,
 });
 app.use(limiter);
 
@@ -137,14 +167,11 @@ app.use(cors(corsOptions));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-// 请求日志
-app.use((req, res, next) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - ${res.statusCode} (${Date.now() - start}ms)`);
-  });
-  next();
-});
+// HTTP 请求日志中间件
+app.use(httpLogger);
+
+// 性能监控中间件
+app.use(performanceMiddleware);
 
 // 根路径路由 - 返回主页
 app.get('/', (req, res) => {
@@ -442,7 +469,7 @@ app.post('/api/chat', authMiddleware(), async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`[API 错误] /api/chat: ${error.message}`);
+    logger.error(`API 错误: /api/chat`, { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       error: error.message,
@@ -532,7 +559,7 @@ app.post('/api/conversation', authMiddleware(), async (req, res) => {
     if (currentSize + trimmedMessage.length > 50000) {
       // 自动清理旧消息，保留最近 10 条
       session.messages = session.messages.slice(-20);
-      console.log(`[会话清理] 会话 ${sessionId} 已清理，保留最近 10 条消息`);
+      logger.info(`会话清理: ${sessionId} 已清理，保留最近 10 条消息`);
     }
 
     // 构建带历史的对话内容
@@ -574,7 +601,7 @@ app.post('/api/conversation', authMiddleware(), async (req, res) => {
     });
 
   } catch (error) {
-    console.error(`[API 错误] /api/conversation: ${error.message}`);
+    logger.error(`API 错误: /api/conversation`, { error: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       error: error.message,
@@ -668,12 +695,15 @@ app.post('/api/performance/metrics', (req, res) => {
     // 所以我们不强制要求认证
     
     // 如果需要，可以在这里添加数据验证和过滤逻辑
-    console.log('[Performance Metrics] 收到性能指标:', req.body?.metric?.name, req.body?.metric?.value);
+    logger.info('收到性能指标', { 
+      metricName: req.body?.metric?.name, 
+      metricValue: req.body?.metric?.value 
+    });
     
     // 简单响应，sendBeacon 不关心响应内容
     res.status(204).end();
   } catch (error) {
-    console.error('[Performance Metrics] 处理性能指标失败:', error);
+    logger.error('处理性能指标失败', { error: error.message, stack: error.stack });
     res.status(204).end(); // 即使出错也要返回成功状态
   }
 });
@@ -753,15 +783,16 @@ app.get('/api/health', async (req, res) => {
 // Sentry 错误处理中间件（放在所有路由之后）
 // 已通过 setupExpressIntegration 在 app 初始化时添加
 
-// 全局错误处理
-app.use((err, req, res, next) => {
-  console.error('全局错误:', err);
-  res.status(500).json({
-    success: false,
-    error: '服务器内部错误',
-    code: 'INTERNAL_ERROR'
-  });
-});
+// ============================================
+// 设置监控路由（必须在错误处理中间件之前）
+// ============================================
+setupMonitoringRoutes(app);
+
+// 404 处理
+app.use(notFoundHandler);
+
+// 统一错误处理
+app.use(errorHandler);
 
 /**
  * GET /api/docs
@@ -1018,10 +1049,10 @@ async function startServer() {
   try {
     // 初始化数据库连接
     if (process.env.RDS_HOST && process.env.RDS_HOST !== 'your-rds-instance.mysql.rds.aliyuncs.com') {
-      console.log('🔌 正在初始化数据库连接...');
+      logger.info('正在初始化数据库连接...');
       await dbManager.initialize();
     } else {
-      console.log('⚠️  未配置 RDS，跳过数据库初始化');
+      logger.warn('未配置 RDS，跳过数据库初始化');
     }
 
     app.listen(PORT, () => {
@@ -1071,11 +1102,14 @@ async function startServer() {
   `);
 
       if (!cliConfigured) {
-        console.log('⚠️  警告：CLI 未配置 API Key，请先运行 node qwen-code.js --init\n');
+        logger.warn('CLI 未配置 API Key，请先运行 node qwen-code.js --init');
       }
+      
+      logger.info(`黄氏家族寻根平台 API 服务已启动，端口: ${PORT}`);
+      logger.info(`API 文档: http://localhost:${PORT}/api/docs`);
     });
   } catch (error) {
-    console.error('❌ 服务器启动失败:', error.message);
+    logger.error('服务器启动失败', { error: error.message, stack: error.stack });
     process.exit(1);
   }
 }
@@ -1084,27 +1118,27 @@ startServer();
 
 // 优雅关闭
 process.on('SIGTERM', async () => {
-  console.log('收到 SIGTERM 信号，正在关闭...');
+  logger.info('收到 SIGTERM 信号，正在关闭...');
   try {
     await dbManager.close();
-    console.log('✅ 数据库连接已关闭');
+    logger.info('数据库连接已关闭');
   } catch (error) {
-    console.error('❌ 关闭数据库连接失败:', error.message);
+    logger.error('关闭数据库连接失败', { error: error.message });
   }
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('收到 SIGINT 信号，正在关闭...');
+  logger.info('收到 SIGINT 信号，正在关闭...');
   try {
     await dbManager.close();
-    console.log('✅ 数据库连接已关闭');
+    logger.info('数据库连接已关闭');
   } catch (error) {
-    console.error('❌ 关闭数据库连接失败:', error.message);
+    logger.error('关闭数据库连接失败', { error: error.message });
   }
   process.exit(0);
 });
 
 process.on('exit', () => {
-  console.log('👋 服务已退出');
+  logger.info('服务已退出');
 });
