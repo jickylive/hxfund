@@ -14,7 +14,7 @@ desktop.ini
 *.user
 
 # Logs
-*.log
+*.logs
 npm-debug.log*
 
 # Temporary files

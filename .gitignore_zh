@@ -1,0 +1,72 @@
+# 操作系统生成的文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+
+# 编辑器目录
+.vscode/
+.idea/
+*.suo
+*.user
+
+# 日志
+*.logs
+npm-debug.log*
+
+# 临时文件
+*.tmp
+*.bak
+*.swp
+
+# 环境变量
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 认证配置（敏感信息）
+server/config/auth.json
+server/config/.env
+
+# SSL 证书（公钥可以提交，私钥必须保密）
+server/config/ssl_private.key
+# server/config/ssl_certificate.crt 可以提交
+
+# GitHub Actions
+.github/workflows/local-*.yml
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dist/
+build/
+.nyc_output
+coverage/
+
+# 子模块博客的 node_modules
+blog/node_modules/
+blog/public/
+blog/.pending_cleanup/
+blog/db.json
+
+# 后端运行时
+logs
+*.log
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# 操作系统生成的文件
+ehthumbs.db
+Icon?
+Thumbs.db

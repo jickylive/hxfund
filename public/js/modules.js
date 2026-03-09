@@ -305,26 +305,59 @@ document.addEventListener('DOMContentLoaded', () => {
     // 模块五：宗亲留言墙
     // =========================================
 
-    function renderGuestList() {
+    // Function to fetch and render guest messages from API
+    async function renderGuestList() {
         const guestList = document.getElementById('guestList');
         if (!guestList) return;
 
-        const messages = window.HuangshiData?.guestMessages || window.guestMessages;
-        if (!messages) return;
+        try {
+            // Show loading state
+            guestList.innerHTML = '<div class="guest-loading">加载留言中...</div>';
 
-        guestList.innerHTML = messages.map(msg => `
-            <div class="guest-item">
-                <div class="guest-header">
-                    <span class="guest-name">${msg.name}</span>
-                    <span class="guest-location">📍 ${msg.location}</span>
-                </div>
-                <div class="guest-content">${msg.content}</div>
-                <div class="guest-footer">
-                    <span class="guest-time">${msg.time}</span>
-                    <button class="guest-reply">回复</button>
-                </div>
-            </div>
-        `).join('');
+            // Fetch messages from API
+            const response = await fetch('/api/db/guest-messages?page=1&limit=20');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || '获取留言失败');
+            }
+
+            const messages = data.data;
+
+            if (!messages || messages.length === 0) {
+                guestList.innerHTML = '<div class="guest-empty">暂无留言，成为第一个留言的宗亲吧！</div>';
+                return;
+            }
+
+            guestList.innerHTML = messages.map(msg => {
+                // Format the date properly
+                const date = new Date(msg.created_at);
+                const formattedTime = isNaN(date.getTime()) ? msg.created_at : 
+                    `${Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24))} 天前`;
+
+                return `
+                    <div class="guest-item">
+                        <div class="guest-header">
+                            <span class="guest-name">${msg.user_name}</span>
+                            <span class="guest-location">📍 ${msg.location || '未知'}</span>
+                        </div>
+                        <div class="guest-content">${msg.content}</div>
+                        <div class="guest-footer">
+                            <span class="guest-time">${formattedTime}</span>
+                            <button class="guest-reply">回复</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('获取留言失败:', error);
+            guestList.innerHTML = `<div class="guest-error">加载留言失败: ${error.message}</div>`;
+        }
     }
 
     const postBtn = document.getElementById('postBtn');
@@ -333,25 +366,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const charCount = document.getElementById('charCount');
 
     if (postBtn && guestInput) {
-        postBtn.addEventListener('click', () => {
+        postBtn.addEventListener('click', async () => {
             const content = guestInput.value.trim();
             const name = guestNameInput?.value.trim() || '匿名宗亲';
 
-            if (!content) { alert('请输入留言内容'); return; }
-            if (content.length > 300) { alert('留言内容不能超过 300 字'); return; }
-
-            const messages = window.HuangshiData?.guestMessages || window.guestMessages;
-            if (messages) {
-                messages.unshift({
-                    id: Date.now(), name, content, time: '刚刚', location: '未知'
-                });
+            if (!content) { 
+                alert('请输入留言内容'); 
+                return; 
+            }
+            if (content.length > 300) { 
+                alert('留言内容不能超过 300 字'); 
+                return; 
             }
 
-            renderGuestList();
-            guestInput.value = '';
-            if (guestNameInput) guestNameInput.value = '';
-            if (charCount) charCount.textContent = '0/300';
-            alert('留言发布成功！');
+            try {
+                // Show loading state
+                postBtn.disabled = true;
+                postBtn.textContent = '提交中...';
+
+                // Submit message to API
+                const response = await fetch('/api/db/guest-messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_name: name,
+                        content: content,
+                        location: '未知'  // Default location if not provided
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Clear form
+                    guestInput.value = '';
+                    if (guestNameInput) guestNameInput.value = '';
+                    if (charCount) charCount.textContent = '0/300';
+                    
+                    // Refresh the message list
+                    await renderGuestList();
+                    
+                    alert('留言提交成功，等待审核后显示！');
+                } else {
+                    throw new Error(result.error || '提交失败');
+                }
+            } catch (error) {
+                console.error('提交留言失败:', error);
+                alert(`留言提交失败: ${error.message}`);
+            } finally {
+                // Reset button state
+                postBtn.disabled = false;
+                postBtn.textContent = '提交留言';
+            }
         });
     }
 
@@ -361,5 +429,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Initialize guest list when DOM is loaded
     renderGuestList();
 });
