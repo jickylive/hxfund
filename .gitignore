@@ -33,9 +33,13 @@ npm-debug.log*
 server/config/auth.json
 server/config/.env
 
-# SSL 证书（公钥可以提交，私钥必须保密）
+# SSL 证书（私钥必须保密，CA 证书可提交）
 server/config/ssl_private.key
-# server/config/ssl_certificate.crt 可以提交
+server/config/private.pem
+server/config/client.pem
+server/config/*.pem
+!server/config/ApsaraDB-CA-Chain.pem
+server/config/*.zip
 
 # GitHub Actions
 .github/workflows/local-*.yml

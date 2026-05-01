@@ -19,12 +19,30 @@ const mysqlConfig = {
   connectTimeout: parseInt(process.env.RDS_CONNECT_TIMEOUT) || 10000,
   acquireTimeout: parseInt(process.env.RDS_ACQUIRE_TIMEOUT) || 10000,
   timezone: '+08:00',
+  
   // SSL 配置（根据 RDS 实例支持情况选择）
   // 如果 RDS 不支持 SSL，设置 RDS_SSL=false
-  ssl: process.env.RDS_SSL === 'true' ? {
-    rejectUnauthorized: false, // 允许自签名证书
-    ...(process.env.MYSQL_SSL_CA_PATH ? { ca: require('fs').readFileSync(process.env.MYSQL_SSL_CA_PATH) } : {})
-  } : false,
+  ssl: process.env.RDS_SSL === 'true' ? (() => {
+    let sslConfig = {
+      rejectUnauthorized: true // 启用证书验证（生产环境必须）
+    };
+
+    if (process.env.MYSQL_SSL_CA_PATH) {
+      sslConfig.ca = require('fs').readFileSync(process.env.MYSQL_SSL_CA_PATH);
+    } else if (process.env.MYSQL_SSL_CA) {
+      sslConfig.ca = Buffer.from(process.env.MYSQL_SSL_CA, 'base64');
+    } else {
+      // 默认使用阿里云 RDS CA 证书路径
+      const path = require('path');
+      const caPath = path.join(__dirname, 'ApsaraDB-CA-Chain.pem');
+      const fs = require('fs');
+      if (fs.existsSync(caPath)) {
+        sslConfig.ca = fs.readFileSync(caPath);
+      }
+    }
+
+    return sslConfig;
+  })() : false,
 };
 
 // 构建连接 URL（方便某些 ORM 使用）
