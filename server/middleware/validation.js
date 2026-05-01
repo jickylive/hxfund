@@ -2,7 +2,7 @@
  * 黄氏家族寻根平台 - 请求验证中间件
  */
 
-export function validateRequest(requiredFields = []) {
+function validateRequest(requiredFields = []) {
   return (req, res, next) => {
     // 验证必需字段
     for (const field of requiredFields) {
@@ -51,3 +51,5 @@ export function validateRequest(requiredFields = []) {
     next();
   };
 }
+
+module.exports = { validateRequest };

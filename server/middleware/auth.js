@@ -2,9 +2,9 @@
  * 黄氏家族寻根平台 - 认证中间件
  */
 
-import { loadAuthConfig, verifyToken } from './auth.js';
+const { loadAuthConfig, verifyToken } = require('./auth');
 
-export function authenticateToken(options = {}) {
+function authenticateToken(options = {}) {
   return (req, res, next) => {
     const config = loadAuthConfig();
 
@@ -59,3 +59,5 @@ export function authenticateToken(options = {}) {
     next();
   };
 }
+
+module.exports = { authenticateToken };

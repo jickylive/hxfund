@@ -3,10 +3,10 @@
  * 模块化API路由管理
  */
 
-import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
-import { rateLimiter } from '../middleware/rate-limit.js';
-import { validateRequest } from '../middleware/validation.js';
+const express = require('express');
+const { authenticateToken } = require('../middleware/auth.js');
+const { rateLimiter } = require('../middleware/rate-limit.js');
+const { validateRequest } = require('../middleware/validation.js');
 
 const router = express.Router();
 
@@ -187,4 +187,4 @@ router.post('/auth/client-token', async (req, res) => {
   });
 });
 
-export default router;
+module.exports = router;
