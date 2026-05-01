@@ -70,6 +70,9 @@ const walineRouter = require('./waline');
 // 引入数据库路由
 const databaseRouter = require('./routes/database');
 
+// 引入族谱 API 路由
+const genealogyRouter = require('./routes/genealogy');
+
 // 引入数据库连接管理器
 const dbManager = require('./config/db-manager');
 
@@ -194,6 +197,9 @@ app.use('/api/waline', walineRouter);
 
 // 数据库 API 路由
 app.use('/api/db', databaseRouter);
+
+// 族谱 API 路由
+app.use('/api/genealogy', genealogyRouter);
 
 // ============================================
 // 配置与常量
