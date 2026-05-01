@@ -164,6 +164,24 @@ hxfund/
 
 > ⚠️ 本项目**不依赖任何前端框架**（无 React / Vue / Angular），零 npm 依赖。
 
+## 📋 推荐实施路线 - 执行进度
+
+| 阶段 | 状态 | 说明 | 提交数 |
+|------|------|------|--------|
+| **Phase 1: 安全加固** | ✅ 已完成 | 移除敏感证书、修复 SSL 验证、统一模块系统、速率限制日志 | 4 |
+| **Phase 2: 族谱后端** | ✅ 已完成 | 服务层 database.js、API 路由 genealogy.js、数据库集成 | 1 |
+| **Phase 3: 前端 API** | ✅ 已完成 | QwenApiClient 扩展 21 个族谱 API 方法 | 1 |
+| **Phase 4: UI 组件** | ✅ 已完成 | 族谱可视化树、字辈诗组件、留言板组件、main.js 集成 | 3 |
+
+**实施路线总览：**
+
+1. **Phase 1 (安全加固)** — 移除 git 历史中的敏感证书文件、修复数据库 SSL 配置、统一 ESM/CommonJS 模块系统
+2. **Phase 2 (族谱后端)** — 创建数据库服务层、族谱 API 路由、RESTful 端点集成
+3. **Phase 3 (前端 API)** — 扩展 QwenApiClient，新增 21 个族谱相关 API 方法
+4. **Phase 4 (UI 组件)** — 实现族谱树可视化、字辈诗展示、留言板交互组件
+
+详见 👉 [项目白皮书 whitepaper.html](whitepaper.html)
+
 ---
 
 ## 📝 博客管理
