@@ -207,12 +207,187 @@ export class QwenApiClient {
     return this.request(`/api/session/${sessionId}`);
   }
 
+  // ============================================
+  // 族谱 API
+  // ============================================
+
   /**
-   * 删除会话
+   * 获取族谱树
    */
-  async deleteSession(sessionId) {
-    return this.request(`/api/session/${sessionId}`, {
+  async getFamilyTree() {
+    return this.request('/api/genealogy/members/tree');
+  }
+
+  /**
+   * 获取成员详情
+   */
+  async getMember(memberId) {
+    return this.request(`/api/genealogy/members/${memberId}`);
+  }
+
+  /**
+   * 获取子成员列表
+   */
+  async getChildMembers(parentId) {
+    return this.request(`/api/genealogy/members/${parentId}/children`);
+  }
+
+  /**
+   * 添加成员 (需要认证)
+   */
+  async addMember(member) {
+    return this.request('/api/genealogy/members', {
+      method: 'POST',
+      body: JSON.stringify(member)
+    });
+  }
+
+  /**
+   * 更新成员 (需要认证)
+   */
+  async updateMember(memberId, member) {
+    return this.request(`/api/genealogy/members/${memberId}`, {
+      method: 'PUT',
+      body: JSON.stringify(member)
+    });
+  }
+
+  /**
+   * 删除成员 (需要认证)
+   */
+  async deleteMember(memberId) {
+    return this.request(`/api/genealogy/members/${memberId}`, {
       method: 'DELETE'
     });
+  }
+
+  // ============================================
+  // 字辈诗 API
+  // ============================================
+
+  /**
+   * 获取所有字辈诗
+   */
+  async getGenerationPoems() {
+    return this.request('/api/genealogy/poems');
+  }
+
+  /**
+   * 添加字辈诗 (需要认证)
+   */
+  async addGenerationPoem(poem) {
+    return this.request('/api/genealogy/poems', {
+      method: 'POST',
+      body: JSON.stringify(poem)
+    });
+  }
+
+  // ============================================
+  // 项目愿景幻灯片 API
+  // ============================================
+
+  /**
+   * 获取所有幻灯片
+   */
+  async getProjectSlides() {
+    return this.request('/api/genealogy/slides');
+  }
+
+  /**
+   * 添加幻灯片 (需要认证)
+   */
+  async addProjectSlide(slide) {
+    return this.request('/api/genealogy/slides', {
+      method: 'POST',
+      body: JSON.stringify(slide)
+    });
+  }
+
+  // ============================================
+  // 留言簿 API
+  // ============================================
+
+  /**
+   * 获取留言
+   */
+  async getGuestMessages() {
+    return this.request('/api/genealogy/messages');
+  }
+
+  /**
+   * 提交留言
+   */
+  async submitGuestMessage(message) {
+    return this.request('/api/genealogy/messages', {
+      method: 'POST',
+      body: JSON.stringify(message)
+    });
+  }
+
+  // ============================================
+  // 区块链记录 API
+  // ============================================
+
+  /**
+   * 获取区块链记录
+   */
+  async getBlockchainRecords() {
+    return this.request('/api/genealogy/blockchain');
+  }
+
+  /**
+   * 添加区块链记录 (需要认证)
+   */
+  async addBlockchainRecord(record) {
+    return this.request('/api/genealogy/blockchain', {
+      method: 'POST',
+      body: JSON.stringify(record)
+    });
+  }
+
+  // ============================================
+  // AI 对话 API
+  // ============================================
+
+  /**
+   * 获取用户对话列表
+   */
+  async getUserConversations(userId) {
+    return this.request(`/api/genealogy/conversations/${userId}`);
+  }
+
+  /**
+   * 获取对话内容
+   */
+  async getConversation(conversationId) {
+    return this.request(`/api/genealogy/conversation/${conversationId}`);
+  }
+
+  // ============================================
+  // 系统配置 API
+  // ============================================
+
+  /**
+   * 获取系统配置
+   */
+  async getSystemConfig(key) {
+    return this.request(`/api/genealogy/config/${key}`);
+  }
+
+  /**
+   * 更新系统配置 (需要认证)
+   */
+  async updateSystemConfig(key, value, description) {
+    return this.request(`/api/genealogy/config/${key}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value, description })
+    });
+  }
+
+  /**
+   * 健康检查
+   */
+  async healthCheck() {
+    return this.request('/api/genealogy/health');
   }
 }
