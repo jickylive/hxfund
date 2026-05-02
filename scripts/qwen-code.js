@@ -38,10 +38,10 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 const QWEN_SETTINGS_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.qwen', 'settings.json');
 
 const DEFAULT_CONFIG = {
-  apiKey: process.env.GITCODE_API_KEY || process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY || '',
-  baseURL: process.env.GITCODE_BASE_URL || process.env.QWEN_BASE_URL || process.env.DASHSCOPE_BASE_URL || 'https://coding.dashscope.aliyuncs.com/v1',
-  model: process.env.GITCODE_MODEL || process.env.QWEN_MODEL || 'qwen3.5-plus',
-  temperature: parseFloat(process.env.GITCODE_TEMPERATURE || process.env.QWEN_TEMPERATURE || '0.7'),
+  apiKey: process.env.SCNET_API_KEY || process.env.GITCODE_API_KEY || process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY || '',
+  baseURL: process.env.SCNET_BASE_URL || process.env.GITCODE_BASE_URL || process.env.QWEN_BASE_URL || process.env.DASHSCOPE_BASE_URL || 'https://coding.dashscope.aliyuncs.com/v1',
+  model: process.env.SCNET_MODEL || process.env.GITCODE_MODEL || process.env.QWEN_MODEL || 'qwen3.5-plus',
+  temperature: parseFloat(process.env.SCNET_TEMPERATURE || process.env.GITCODE_TEMPERATURE || process.env.QWEN_TEMPERATURE || '0.7'),
   systemPrompt: '你是黄氏家族寻根助手，由通义千问提供技术支持。你专注于：\n1. 解答黄姓起源、历史和文化\n2. 帮助查询族谱和字辈信息\n3. 提供寻根问祖相关咨询\n4. 传承和弘扬黄氏家族传统美德\n\n作为编程助手，你也擅长解答代码相关问题。'
 };
 
@@ -452,10 +452,10 @@ function callQwenAPI(config, prompt, conversationHistory = []) {
 
     const data = JSON.stringify(requestBody);
 
-    // 根据baseURL确定hostname
-    const isGitCode = config.baseURL.includes('api-ai.gitcode.com');
-    const hostname = isGitCode ? 'api-ai.gitcode.com' : 'coding.dashscope.aliyuncs.com';
-    const path = urlPath.replace(isGitCode ? 'https://api-ai.gitcode.com' : 'https://coding.dashscope.aliyuncs.com', '');
+    // 根据baseURL动态提取hostname和path
+    const urlObj = new URL(urlPath);
+    const hostname = urlObj.hostname;
+    const path = urlObj.pathname;
 
     const options = {
       hostname: hostname,

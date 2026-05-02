@@ -133,28 +133,29 @@
         <section id="tree" class="section">
             <div class="container">
                 <div class="section-header">
-                    <div class="section-badge">GENEALOGY TREE</div>
+                    <div class="section-badge">家谱世系</div>
                     <h2 class="section-title">家族世系树</h2>
                     <p class="section-desc">递归展示黄氏传承脉络，点击族人卡片查看详细档案</p>
                 </div>
+
                 <div class="tree-controls">
                     <button class="tree-btn" id="expandAll">展开全部</button>
                     <button class="tree-btn" id="collapseAll">收折全部</button>
                     <span class="tree-hint">← 横向滚动查看更多 →</span>
                 </div>
+
                 <div class="tree-container">
                     <div class="tree-wrapper" id="treeRoot">
-                        <!-- 树节点将通过 JS 渲染 -->
+                        <p class="loading-hint">族谱数据加载中...</p>
                     </div>
                 </div>
             </div>
         </section>
-
         <!-- 模块三：智能字辈计算器 -->
         <section id="calculator" class="section bg-alt">
             <div class="container">
                 <div class="section-header">
-                    <div class="section-badge">GENERATION CALCULATOR</div>
+                    <div class="section-badge">字辈推算</div>
                     <h2 class="section-title">字辈推算</h2>
                     <p class="section-desc">输入您所在的世系代数，智能匹配对应字辈汉字</p>
                 </div>
@@ -194,12 +195,10 @@
         <section id="ppt" class="section">
             <div class="container">
                 <div class="section-header">
-                    <div class="section-badge">PROJECT VISION</div>
+                    <div class="section-badge">项目愿景</div>
                     <h2 class="section-title">项目愿景与规划</h2>
                     <p class="section-desc">探索黄氏家族寻根平台的宏伟蓝图与发展路径</p>
                 </div>
-
-                <!-- 幻灯片展示区 -->
                 <div class="ppt-viewer-wrap">
                     <button class="ppt-arrow ppt-prev" id="pptPrev" aria-label="上一张">&#8249;</button>
                     <div class="ppt-viewer">

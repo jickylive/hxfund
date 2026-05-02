@@ -6,7 +6,7 @@
 export class GenealogyTree {
   constructor(apiClient) {
     this.api = apiClient;
-    this.container = document.getElementById('tree');
+    this.container = document.querySelector('#tree .container');
     this.treeRoot = document.getElementById('treeRoot');
     this.members = [];
     this.expanded = new Set();
@@ -19,17 +19,20 @@ export class GenealogyTree {
   async init() {
     if (!this.treeRoot) return;
 
-    this.container.innerHTML = `
-      <div class="tree-toolbar">
-        <button id="expandAll" class="btn btn-small">全部展开</button>
-        <button id="collapseAll" class="btn btn-small">全部折叠</button>
-        <button id="resetView" class="btn btn-small">重置视图</button>
-        <span class="member-count" id="memberCount">加载中...</span>
-      </div>
-      <div id="treeRoot" class="tree-container"></div>
+    // 在 container 中插入工具栏，不覆盖 section-header
+    const toolbar = document.createElement('div');
+    toolbar.className = 'tree-toolbar';
+    toolbar.innerHTML = `
+      <button id="expandAll" class="btn btn-small">全部展开</button>
+      <button id="collapseAll" class="btn btn-small">全部折叠</button>
+      <button id="resetView" class="btn btn-small">重置视图</button>
+      <span class="member-count" id="memberCount">加载中...</span>
     `;
 
-    this.treeRoot = document.getElementById('treeRoot');
+    // 插入到 treeRoot 之前
+    if (this.container) {
+      this.container.insertBefore(toolbar, this.treeRoot);
+    }
 
     try {
       await this.loadTree();

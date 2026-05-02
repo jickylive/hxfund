@@ -25,9 +25,12 @@ const compression = require('compression');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
+const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config({ path: path.join(__dirname, 'config', '.env') });
+const https = require('https');
+const http = require('http');
 
 // 引入统一日志管理
 const logger = require('./config/logger');
@@ -73,6 +76,9 @@ const databaseRouter = require('./routes/database');
 // 引入族谱 API 路由
 const genealogyRouter = require('./routes/genealogy');
 
+// 引入 OpenAI 兼容 API 路由
+const openaiRouter = require('./routes/openai');
+
 // 引入数据库连接管理器
 const dbManager = require('./config/db-manager');
 
@@ -107,19 +113,14 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https:", "http:"],
-      scriptSrc: ["'self'", "https://unpkg.com", "https://cdn.jsdelivr.net"],
-      imgSrc: ["'self'", "data:", "https:", "http:"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://unpkg.com", "https://cdn.jsdelivr.net"],
       connectSrc: ["'self'", "https://coding.dashscope.aliyuncs.com", "https://*.aliyuncs.com"],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
       upgradeInsecureRequests: [],
+      scriptSrcAttr: ["'self'"],
     },
   },
-  hsts: {
-    maxAge: 31536000, // 1年
-    includeSubDomains: true,
-    preload: true
-  }
 }));
 
 // 增强速率限制（IP + 用户双重限制）
@@ -143,7 +144,7 @@ const corsOptions = {
     // 允许的来源列表
     const allowedOrigins = process.env.ALLOWED_ORIGINS
       ? process.env.ALLOWED_ORIGINS.split(',')
-      : ['http://localhost:3000', 'http://127.0.0.1:3000'];
+      : ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://localhost:3000', 'https://127.0.0.1:3000'];
 
     // 允许不带 origin 的请求（如移动端、Postman、同源请求）
     if (!origin) return callback(null, true);
@@ -200,6 +201,13 @@ app.use('/api/db', databaseRouter);
 
 // 族谱 API 路由
 app.use('/api/genealogy', genealogyRouter);
+
+// ============================================
+// OpenAI 兼容 API（/v1/*）
+// ============================================
+
+// OpenAI 兼容路由
+app.use('/v1', openaiRouter);
 
 // ============================================
 // 配置与常量
@@ -1061,16 +1069,39 @@ async function startServer() {
       logger.warn('未配置 RDS，跳过数据库初始化');
     }
 
-    app.listen(PORT, () => {
-      const cliConfigured = isCliConfigured();
-      const cliConfig = getCliConfig();
+    const cliConfigured = isCliConfigured();
+    const cliConfig = getCliConfig();
 
+    // SSL 配置（开发环境）
+    const sslEnabled = process.env.NODE_ENV === 'production' || process.env.DEV_SSL === 'true';
+    let server;
+
+    if (sslEnabled) {
+      const sslCertPath = path.join(__dirname, '..', 'ssl', 'server.pem');
+      const sslKeyPath = path.join(__dirname, '..', 'ssl', 'server.key');
+      
+      if (fs.existsSync(sslCertPath) && fs.existsSync(sslKeyPath)) {
+        const sslOptions = {
+          key: fs.readFileSync(sslKeyPath),
+          cert: fs.readFileSync(sslCertPath)
+        };
+        server = https.createServer(sslOptions, app);
+      } else {
+        logger.warn('SSL 证书不存在，使用 HTTP');
+        server = http.createServer(app);
+      }
+    } else {
+      server = http.createServer(app);
+    }
+
+    server.listen(PORT, () => {
+      const protocol = sslEnabled ? 'https' : 'http';
       console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║   黄氏家族寻根平台 - API 服务 (CLI + Waline + RDS)         ║
 ╠═══════════════════════════════════════════════════════════╣
-║  运行地址：http://localhost:${PORT}                         ║
-║  API 文档：http://localhost:${PORT}/api/docs                ║
+║  运行地址：${protocol}://localhost:${PORT}                         ║
+║  API 文档：${protocol}://localhost:${PORT}/api/docs                ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  AI API 端点：                                             ║
 ║    POST /api/chat          - 单次对话                     ║
@@ -1112,7 +1143,7 @@ async function startServer() {
       }
       
       logger.info(`黄氏家族寻根平台 API 服务已启动，端口: ${PORT}`);
-      logger.info(`API 文档: http://localhost:${PORT}/api/docs`);
+      logger.info(`API 文档: ${protocol}://localhost:${PORT}/api/docs`);
     });
   } catch (error) {
     logger.error('服务器启动失败', { error: error.message, stack: error.stack });

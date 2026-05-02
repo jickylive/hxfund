@@ -12,7 +12,7 @@ const mysqlConfig = {
   host: process.env.RDS_HOST || 'localhost',
   port: parseInt(process.env.RDS_PORT) || 3306,
   database: process.env.RDS_DATABASE || 'hxfund_db',
-  user: process.env.RDS_USERNAME || 'root',
+  user: process.env.RDS_USER || 'root',
   password: process.env.RDS_PASSWORD || '',
   charset: process.env.RDS_CHARSET || 'utf8mb4',
   connectionLimit: parseInt(process.env.RDS_CONNECTION_LIMIT) || 10,

@@ -132,6 +132,13 @@ function parseSize(size) {
  * 拒绝已知的恶意用户代理
  */
 function userAgentValidator(req, res, next) {
+  // 跳过静态文件请求（CSS、JS、图片等）
+  const staticExtensions = /\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|map)$/i;
+  const isStaticFile = staticExtensions.test(req.path);
+  if (isStaticFile) {
+    return next();
+  }
+
   const userAgent = req.get('user-agent') || '';
   
   // 已知的恶意用户代理模式

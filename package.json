@@ -22,6 +22,8 @@
     "save": "node scripts/save-progress.js",
     "qwen": "node qwen-code.js",
     "qwen:init": "node qwen-code.js --init",
+    "atomcode": "node scripts/atomcode-cli.js",
+    "atomcode:init": "node scripts/atomcode-cli.js --init",
     "test": "node tests/test-api.js && node tests/test-auth.js && node tests/test-chat.js",
     "test:unit": "jest --testPathPattern=tests/services",
     "test:integration": "jest --testPathPattern=tests/integration",
@@ -30,11 +32,12 @@
     "clean": "rm -rf node_modules package-lock.json && npm install"
   },
   "bin": {
-    "qwen-code": "./scripts/qwen-code.bat"
+    "qwen-code": "scripts/qwen-code.bat"
   },
   "dependencies": {
     "@sentry/node": "^10.42.0",
     "@sentry/tracing": "^7.120.4",
+    "better-sqlite3": "^12.9.0",
     "body-parser": "^1.20.2",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
@@ -81,7 +84,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/huangshi-genealogy/hxfund.cn.git"
+    "url": "git+https://github.com/huangshi-genealogy/hxfund.cn.git"
   },
   "bugs": {
     "url": "https://github.com/huangshi-genealogy/hxfund.cn/issues"
@@ -95,5 +98,10 @@
     "> 1%",
     "last 2 versions",
     "not dead"
-  ]
+  ],
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "type": "commonjs"
 }
