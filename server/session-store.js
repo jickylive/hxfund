@@ -17,7 +17,8 @@ const redis = require('redis');
 const SessionBackupManager = require('./session-backup');
 
 // 配置
-const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const REDIS_ENABLED = process.env.REDIS_ENABLED !== 'false' && process.env.REDIS_ENABLED !== '0';
+const REDIS_URL = REDIS_ENABLED && process.env.REDIS_URL ? process.env.REDIS_URL : null;
 const SESSION_PREFIX = 'session:';
 const DEFAULT_TTL = 24 * 60 * 60; // 24 小时
 
@@ -39,14 +40,23 @@ const backupManager = new SessionBackupManager({
  * 初始化 Redis 连接
  */
 async function initRedis() {
+  // Redis 已禁用或无配置
+  if (!REDIS_ENABLED || !REDIS_URL) {
+    console.log('[Redis] 已禁用，使用内存存储降级方案');
+    isRedisConnected = false;
+    return null;
+  }
   if (redisClient) return redisClient;
 
   try {
     redisClient = redis.createClient({ url: REDIS_URL });
 
     redisClient.on('error', (err) => {
-      console.error('[Redis] 连接错误:', err.message);
-      isRedisConnected = false;
+      // 抑制连接失败的重复报错（首次启动时已记录过）
+      if (isRedisConnected) {
+        console.error('[Redis] 连接错误:', err.message);
+        isRedisConnected = false;
+      }
     });
 
     redisClient.on('connect', () => {

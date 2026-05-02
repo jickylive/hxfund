@@ -18,6 +18,7 @@ const SUPPORTED_MODELS = [
   { id: 'glm-4.7', name: 'GLM-4.7', description: '支持思考模式' },
   { id: 'kimi-k2.5', name: 'Kimi K2.5', description: '支持思考模式' },
   { id: 'Qwen/Qwen3.5-397B-A17B', name: 'Qwen3.5-397B-A17B (GitCode)', description: 'GitCode OpenAI兼容模型' },
+  { id: 'Qwen3-235B-A22B', name: 'Qwen3-235B-A22B (SCNET)', description: 'SCNET OpenAI兼容模型' },
 ];
 
 /**

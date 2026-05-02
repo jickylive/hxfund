@@ -2,76 +2,60 @@
  * 黄氏家族寻根平台 - Web Vitals 监控
  * 
  * 性能指标监控和上报
+ * 
+ * 降级实现：使用内联测量替代 web-vitals 库
  */
 
-import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
-
 // 性能指标上报函数
-function sendToAnalytics(metric) {
-  // 在生产环境中，可以将指标发送到分析服务
-  console.log(`[Web Vitals] ${metric.name}: ${metric.value.toFixed(2)}`, metric);
+function sendToAnalytics(metricName, value) {
+  console.log(`[Web Vitals] ${metricName}: ${value}`);
 
-  // 发送到后端 API 进行收集（可选）
   if ('sendBeacon' in navigator) {
-    // 准备上报数据
     const data = {
-      metric: {
-        name: metric.name,
-        value: metric.value,
-        id: metric.id,
-        navigationType: metric.navigationType,
-        attribution: metric.attribution || {}
-      },
+      metric: { name: metricName, value },
       timestamp: Date.now(),
       url: window.location.href,
-      userAgent: navigator.userAgent,
-      connection: navigator.connection ? {
-        effectiveType: navigator.connection.effectiveType,
-        rtt: navigator.connection.rtt
-      } : null
+      userAgent: navigator.userAgent
     };
-
-    // 使用 sendBeacon 发送数据（非阻塞）
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-    navigator.sendBeacon('/api/performance/metrics', blob);
+    try { navigator.sendBeacon('/api/performance/metrics', blob); } catch (e) { /* ignore */ }
   }
 }
 
-// 上报所有核心 Web Vitals 指标
+// 上报核心 Web Vitals 指标（降级实现）
 function reportWebVitals() {
-  getCLS(sendToAnalytics);
-  getFID(sendToAnalytics);
-  getFCP(sendToAnalytics);
-  getLCP(sendToAnalytics);
-  getTTFB(sendToAnalytics);
+  // 使用 Performance API 获取基础指标
+  try {
+    const perfEntries = performance.getEntriesByType('navigation');
+    if (perfEntries.length > 0) {
+      const nav = perfEntries[0];
+      // FCP: 首次内容绘制
+      const fcp = performance.getEntriesByName('first-contentful-paint');
+      if (fcp.length > 0) {
+        sendToAnalytics('FCP', fcp[0].startTime);
+      }
+      // LCP: 最大内容绘制（需要 PerformanceObserver）
+      // TTFB: 首字节时间
+      sendToAnalytics('TTFB', nav.responseStart - nav.requestStart);
+      sendToAnalytics('DOMReady', nav.domContentLoadedEventEnd - nav.startTime);
+    }
+  } catch (e) {
+    console.warn('[Web Vitals] 测量失败:', e);
+  }
 }
 
 // 页面加载完成后开始监控
 if ('requestIdleCallback' in window) {
-  // 使用空闲回调以避免影响页面性能
   requestIdleCallback(() => {
     reportWebVitals();
   });
 } else {
-  // 降级处理
-  setTimeout(() => {
-    reportWebVitals();
-  }, 0);
+  setTimeout(reportWebVitals, 0);
 }
 
-// 监控页面可见性变化，当页面重新变为可见时也上报
+// 监控页面可见性变化
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    // 延迟上报，确保页面完全加载
     setTimeout(reportWebVitals, 1000);
   }
 });
-
-// 监控页面卸载前的最终指标
-window.addEventListener('beforeunload', () => {
-  // 这里可以发送最后的指标数据
-  // 注意：由于页面即将卸载，使用 sendBeacon 是最佳选择
-});
-
-// 导出函数供其他模块使用
-export { reportWebVitals, sendToAnalytics };

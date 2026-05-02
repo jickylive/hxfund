@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // 确定API基础URL
             const apiBaseUrl = window.API_CONFIG?.baseURL || 
-                              (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
+                              (window.location.hostname === 'localhost' ? '' : 'https://api.hxfund.cn');
             
             // 从服务器代理端点获取新 Token（不暴露 API Key）
             const response = await fetch(`${apiBaseUrl}/api/auth/client-token`, {
