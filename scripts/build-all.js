@@ -13,14 +13,6 @@
 import { execSync } from 'child_process';
 import { copyFileSync, mkdirSync, readdirSync, statSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { join, resolve } from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-function dirname(filepath) {
-  return filepath.substring(0, filepath.lastIndexOf('/')) || filepath.substring(0, filepath.lastIndexOf('\\'));
-}
 
 const BUILD_DIR = './dist';
 const FRONTEND_SRC = './frontend';
