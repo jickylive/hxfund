@@ -25,8 +25,7 @@ export default async () => {
   return {
     root: '.', // 项目根目录
     base: './', // 相对路径部署
-    publicDir: 'assets', // 静态资源目录
-    server: {
+      server: {
       host: true,
       port: 3001,
       https: false, // 开发环境下不使用HTTPS
