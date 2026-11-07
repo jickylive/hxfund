@@ -1,0 +1,4 @@
+node_modules/
+dist/
+public/js/main.*.js
+database/database-init-mongodb.js
