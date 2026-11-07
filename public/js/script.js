@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const qwenTemperature = document.getElementById('qwenTemperature');
     const tempValue = document.getElementById('tempValue');
 
-    let selectedImageFile = null;
     let sessionId = null;
     let totalTokens = 0;
     let authToken = null;
@@ -224,26 +223,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 图片上传（注意：后端 /api/conversation 目前不接受图片，图片仅本地预览，不会发给 AI）
-    const qwenImageUpload = document.getElementById('qwenImageUpload');
-    const qwenImagePreview = document.getElementById('qwenImagePreview');
-
-    if (qwenImageUpload) {
-        qwenImageUpload.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file && file.type.match('image.*')) {
-                selectedImageFile = file;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    if (qwenImagePreview) {
-                        qwenImagePreview.innerHTML = `<img src="${event.target.result}" alt="预览">`;
-                        qwenImagePreview.style.display = 'block';
-                    }
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-    }
 
     // 添加消息（内容先转义再插 innerHTML，防 XSS；换行转 <br> 保留排版）
     function addMessage(role, content) {
@@ -342,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 防重复提交：请求在途时忽略再次点击
         if (isSending) return;
         const message = qwenInput.value.trim();
-        if (!message && !selectedImageFile) {
+        if (!message) {
             qwenInput.classList.add('shake');
             setTimeout(() => qwenInput.classList.remove('shake'), 500);
             return;
@@ -351,18 +330,12 @@ document.addEventListener('DOMContentLoaded', () => {
         qwenSendBtn.disabled = true;
 
         // 添加用户消息
-        let displayContent = message;
-        if (selectedImageFile) {
-            displayContent = `[图片：${selectedImageFile.name}] ${message}`;
-        }
-        addMessage('user', displayContent);
+        addMessage('user', message);
 
         const currentMessage = message;
 
         // 清空输入
         qwenInput.value = '';
-        if (qwenImagePreview) qwenImagePreview.style.display = 'none';
-        selectedImageFile = null;
 
         // 显示加载状态
         const loadingDiv = document.createElement('div');

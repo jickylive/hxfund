@@ -8,6 +8,10 @@ import { setupSmoothScroll } from '../utils/scroll.js';
 import { setupBackToTop } from '../utils/back-to-top.js';
 import { setupAnimations } from '../utils/animations.js';
 import { initializeQwenAI } from '../components/qwen-ai.js';
+import { GenealogyTree } from './components/genealogy-tree.js';
+import { GenerationPoemComponent } from './components/generation-poem.js';
+import { GuestbookComponent } from './components/guestbook.js';
+import { QwenApiClient } from './utils/api-client.js';
 
 // 导入并执行 Web Vitals 监控
 import '../js/web-vitals.js';
@@ -51,6 +55,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // 初始化Qwen AI客户端
         await initializeQwenAI();
+
+        // 初始化族谱/字辈/留言墙（此前入口未加载这三个模块，上线后功能全无）
+        const apiClient = new QwenApiClient();
+        await new GenealogyTree(apiClient).init();
+        await new GenerationPoemComponent(apiClient).init();
+        await new GuestbookComponent(apiClient).init();
 
         console.log('黄氏家族寻根平台 - 初始化完成');
     } catch (error) {
