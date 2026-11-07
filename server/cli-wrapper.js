@@ -23,7 +23,7 @@ function loadCliConfig() {
         return {
           apiKey: process.env.GITCODE_API_KEY,
           baseURL: process.env.GITCODE_BASE_URL || 'https://api-ai.gitcode.com/v1',
-          model: process.env.GITCODE_MODEL || 'Qwen/Qwen3.5-397B-A17B',
+          model: process.env.GITCODE_MODEL || 'deepseek-ai/DeepSeek-V4-Flash',
           temperature: parseFloat(process.env.GITCODE_TEMPERATURE) || 0.7
         };
       // 如果是SCNET配置，则使用SCNET的参数
