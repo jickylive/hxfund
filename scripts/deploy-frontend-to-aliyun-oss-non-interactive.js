@@ -45,9 +45,6 @@ if (!bucketName || !accessKeyId || !accessKeySecret) {
 // 配置变量
 const DEPLOY_DIR = '/root/hxfund';
 const DIST_DIR = path.join(DEPLOY_DIR, 'dist');
-const BACKUP_DIR = path.join(DEPLOY_DIR, 'backups');
-const TIMESTAMP = new Date().toISOString().replace(/[:.]/g, '-');
-const BACKUP_NAME = `backup_${TIMESTAMP}`;
 
 // 检查构建目录是否存在
 if (!fs.existsSync(DIST_DIR)) {
