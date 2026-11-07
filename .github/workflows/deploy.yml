@@ -105,6 +105,7 @@ jobs:
           **/scripts/**
           **.md
           **.env
+          **/*.map
         dangerous-clean-slate: false
 
     - name: Notify deployment
