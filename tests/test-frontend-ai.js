@@ -5,7 +5,6 @@
 
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
 
 // 创建一个模拟服务器，用于测试前端功能
 const app = express();
