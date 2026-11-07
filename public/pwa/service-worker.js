@@ -135,7 +135,7 @@ self.addEventListener('fetch', (event) => {
  * 判断是否为版本化资源（带哈希的文件名）
  */
 function isVersionedAsset(pathname) {
-  return /[\.-][0-9a-f]{8}\./.test(pathname) || pathname.includes('.min.');
+  return /[.-][0-9a-f]{8}\./.test(pathname) || pathname.includes('.min.');
 }
 
 /**
