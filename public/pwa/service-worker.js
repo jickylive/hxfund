@@ -10,7 +10,7 @@
  */
 
 // 版本号（每次更新时递增）
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `dynamic-${CACHE_VERSION}`;
 
@@ -104,6 +104,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // 只拦截同源请求：跨域 API（如 api.hxfund.cn）直接走网络，不经过 SW。
+  // 原因：SW 拦截跨域 GET 时，networkFirst 里的 cache.put 可能因跨域响应
+  // 缓存限制而抛错，导致整个请求失败（页面内 fetch 报 Failed to fetch，
+  // 而直接访问接口域名却正常）。同源静态资源与页面仍由 SW 接管。
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // API 请求：网络优先，不缓存敏感数据
   if (url.pathname.startsWith('/api/')) {
     // 不缓存认证相关 API
@@ -149,10 +157,14 @@ function isStaticAsset(pathname) {
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    const cache = await caches.open(DYNAMIC_CACHE);
-    // 仅缓存成功响应
+    // 缓存写入失败（如响应不可缓存、配额满）只记日志，绝不能丢弃刚拿到的新鲜响应
     if (response.ok) {
-      cache.put(request, response.clone());
+      try {
+        const cache = await caches.open(DYNAMIC_CACHE);
+        await cache.put(request, response.clone());
+      } catch (cacheError) {
+        console.log('[SW] 缓存写入失败，忽略:', cacheError.message);
+      }
     }
     return response;
   } catch (error) {

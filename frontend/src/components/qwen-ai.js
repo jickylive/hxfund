@@ -15,7 +15,6 @@ class QwenAI {
     this.qwenTemperature = document.getElementById('qwenTemperature');
     this.tempValue = document.getElementById('tempValue');
 
-    this.selectedImageFile = null;
     this.sessionId = null;
     this.totalTokens = 0;
     this.authToken = null;
@@ -92,24 +91,6 @@ class QwenAI {
       this.tempValue.textContent = this.qwenTemperature.value;
     });
 
-    // 图片上传
-    const qwenImageUpload = document.getElementById('qwenImageUpload');
-    const qwenImagePreview = document.getElementById('qwenImagePreview');
-
-    if (qwenImageUpload && qwenImagePreview) {
-      qwenImageUpload.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file && file.type.match('image.*')) {
-          this.selectedImageFile = file;
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            qwenImagePreview.innerHTML = `<img src="${event.target.result}" alt="预览">`;
-            qwenImagePreview.style.display = 'block';
-          };
-          reader.readAsDataURL(file);
-        }
-      });
-    }
 
     // 发送按钮
     if (this.qwenSendBtn) {
@@ -219,28 +200,19 @@ class QwenAI {
     if (!this.qwenInput) return;
     
     const message = this.qwenInput.value.trim();
-    if (!message && !this.selectedImageFile) {
+    if (!message) {
       this.qwenInput.classList.add('shake');
       setTimeout(() => this.qwenInput.classList.remove('shake'), 500);
       return;
     }
 
     // 添加用户消息
-    let displayContent = message;
-    if (this.selectedImageFile) {
-      displayContent = `[图片：${this.selectedImageFile.name}] ${message}`;
-    }
-    this.addMessage('user', displayContent);
+    this.addMessage('user', message);
 
     const currentMessage = message;
 
     // 清空输入
     this.qwenInput.value = '';
-    const qwenImagePreview = document.getElementById('qwenImagePreview');
-    if (qwenImagePreview) {
-      qwenImagePreview.style.display = 'none';
-    }
-    this.selectedImageFile = null;
 
     // 显示加载状态
     const loadingDiv = document.createElement('div');

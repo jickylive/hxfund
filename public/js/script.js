@@ -13,20 +13,56 @@ document.addEventListener('DOMContentLoaded', () => {
     const qwenTemperature = document.getElementById('qwenTemperature');
     const tempValue = document.getElementById('tempValue');
 
-    let selectedImageFile = null;
     let sessionId = null;
     let totalTokens = 0;
     let authToken = null;
     let tokenExpiresAt = null;
+    let isSending = false;
+
+    // 关键元素缺失时整个客户端无法工作，直接退出避免后续空指针
+    if (!qwenMessages || !qwenInput || !qwenSendBtn) {
+        console.error('Qwen AI 客户端初始化失败：缺少必要的 DOM 元素');
+        return;
+    }
+
+    // 统一的 API 基础地址：生产走 API_CONFIG，本地开发认 localhost 与 127.0.0.1
+    function getApiBaseUrl() {
+        if (window.API_CONFIG?.baseURL) return window.API_CONFIG.baseURL;
+        const host = window.location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000';
+        return 'https://api.hxfund.cn';
+    }
+
+    // HTML 转义：用户输入与 AI 响应进 innerHTML 前必须转义，防 XSS
+    function escapeHtml(text) {
+        return String(text ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // 安全解析本地配置：localStorage 损坏时回退 {} 并清除坏键，不让初始化中断
+    function safeParseConfig(raw) {
+        if (!raw) return {};
+        try {
+            const parsed = JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (e) {
+            console.warn('本地配置解析失败，已重置:', e.message);
+            try { localStorage.removeItem('qwenConfig'); } catch (_) {}
+            return {};
+        }
+    }
 
     // 加载配置
     function loadConfig() {
-        const saved = localStorage.getItem('qwenConfig');
-        if (saved) {
-            const config = JSON.parse(saved);
-            qwenModelSelect.value = config.model || 'qwen3.5-plus';
-            qwenTemperature.value = config.temperature || '0.7';
-            tempValue.textContent = config.temperature || '0.7';
+        const config = safeParseConfig(localStorage.getItem('qwenConfig'));
+        if (config.model && qwenModelSelect) qwenModelSelect.value = config.model;
+        if (config.temperature) {
+            if (qwenTemperature) qwenTemperature.value = config.temperature;
+            if (tempValue) tempValue.textContent = config.temperature;
         }
 
         // 优先从 sessionStorage 加载 Token（更安全）
@@ -45,13 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // sessionStorage 无有效 Token，尝试从 localStorage 加载
-        if (saved) {
-            const config = JSON.parse(saved);
-            if (config.token && config.tokenExpiresAt && config.tokenExpiresAt > Date.now()) {
-                authToken = config.token;
-                tokenExpiresAt = config.tokenExpiresAt;
-                console.log('✓ 已加载 localStorage 中的认证 Token');
-            }
+        if (config.token && config.tokenExpiresAt && config.tokenExpiresAt > Date.now()) {
+            authToken = config.token;
+            tokenExpiresAt = config.tokenExpiresAt;
+            console.log('✓ 已加载 localStorage 中的认证 Token');
         }
 
         loadModels();
@@ -60,8 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 保存配置
     function saveConfig() {
         const config = {
-            model: qwenModelSelect.value,
-            temperature: qwenTemperature.value,
+            model: qwenModelSelect ? qwenModelSelect.value : 'qwen3.5-plus',
+            temperature: qwenTemperature ? qwenTemperature.value : '0.7',
             token: authToken,
             tokenExpiresAt: tokenExpiresAt
         };
@@ -70,9 +103,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 温度值更新
-    qwenTemperature.addEventListener('input', () => {
-        tempValue.textContent = qwenTemperature.value;
-    });
+    if (qwenTemperature) {
+        qwenTemperature.addEventListener('input', () => {
+            if (tempValue) tempValue.textContent = qwenTemperature.value;
+        });
+    }
 
     // 获取认证 Token
     async function getAuthToken() {
@@ -82,10 +117,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // 确定API基础URL
-            const apiBaseUrl = window.API_CONFIG?.baseURL || 
-                              (window.location.hostname === 'localhost' ? '' : 'https://api.hxfund.cn');
-            
+            const apiBaseUrl = getApiBaseUrl();
+
             // 从服务器代理端点获取新 Token（不暴露 API Key）
             const response = await fetch(`${apiBaseUrl}/api/auth/client-token`, {
                 method: 'POST',
@@ -119,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionStorage.setItem('tokenExpiresAt', tokenExpiresAt.toString());
 
                 // 同时保存到 localStorage（用于持久化配置）
-                const savedConfig = JSON.parse(localStorage.getItem('qwenConfig') || '{}');
+                const savedConfig = safeParseConfig(localStorage.getItem('qwenConfig'));
                 savedConfig.token = authToken;
                 savedConfig.tokenExpiresAt = tokenExpiresAt;
                 localStorage.setItem('qwenConfig', JSON.stringify(savedConfig));
@@ -131,20 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return null;
             }
         } catch (error) {
+            // 只记日志不插消息：由调用方（发送/刷新按钮）统一展示，避免一次失败出两条气泡
             console.error('获取认证 Token 失败:', error.message);
-            
-            // 区分不同类型的错误
-            if (error.message.includes('404') || error.message.includes('not found')) {
-                addMessage('ai', `⚠️ 网络连接问题：API 端点不存在<br>请检查网络连接或联系管理员。`);
-            } else if (error.message.includes('403') || error.message.includes('forbidden')) {
-                addMessage('ai', `⚠️ 认证错误：访问被拒绝<br>请联系管理员检查权限。`);
-            } else if (error.message.includes('网络') || error.message.includes('Network')) {
-                addMessage('ai', `⚠️ 网络连接问题：${error.message}<br>请检查网络连接或稍后重试。`);
-            } else {
-                addMessage('ai', `⚠️ 网络连接问题：${error.message}<br>请检查网络连接或稍后重试。`);
-            }
-
-            // 网络错误等情况下返回 null
             return null;
         }
     }
@@ -152,28 +173,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // 加载模型列表
     async function loadModels() {
         try {
-            // 确定API基础URL
-            const apiBaseUrl = window.API_CONFIG?.baseURL || 
-                              (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
-            
+            const apiBaseUrl = getApiBaseUrl();
+
             const res = await fetch(`${apiBaseUrl}/api/models`, {
                 headers: {
                     'Cache-Control': 'no-cache'
                 }
             });
-            
+
             if (!res.ok) {
                 throw new Error(`HTTP ${res.status}: ${res.statusText}`);
             }
-            
+
             const data = await res.json();
             if (data.success) {
-                const currentModel = qwenModelSelect.value;
-                qwenModelSelect.innerHTML = data.models.map(m =>
-                    `<option value="${m.id}" ${m.default ? 'selected' : ''}>${m.name} (${m.id})${m.default ? ' - 默认' : ''}</option>`
-                ).join('');
-                if (currentModel && data.models.some(m => m.id === currentModel)) {
-                    qwenModelSelect.value = currentModel;
+                if (!Array.isArray(data.models) || data.models.length === 0) {
+                    throw new Error('模型列表数据格式异常：models 不是有效数组');
+                }
+                const currentModel = qwenModelSelect ? qwenModelSelect.value : '';
+                if (qwenModelSelect) {
+                    qwenModelSelect.innerHTML = data.models.map(m =>
+                        `<option value="${escapeHtml(m.id)}" ${m.default ? 'selected' : ''}>${escapeHtml(m.name)} (${escapeHtml(m.id)})${m.default ? ' - 默认' : ''}</option>`
+                    ).join('');
+                    if (currentModel && data.models.some(m => m.id === currentModel)) {
+                        qwenModelSelect.value = currentModel;
+                    }
                 }
 
                 // 获取认证 Token
@@ -184,36 +208,23 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.error('加载模型列表失败:', error.message);
-            
-            // 检查错误类型并提供更准确的错误信息
+
+            // 区分真正的网络异常与数据格式问题，避免误导用户去查网络
+            const isNetworkError = error instanceof TypeError && error.message === 'Failed to fetch';
             if (error.message.includes('404')) {
                 addMessage('ai', `⚠️ 网络错误：API 端点不存在<br>无法加载模型列表，请检查网络连接或联系管理员。`);
             } else if (error.message.includes('Unexpected token <')) {
                 addMessage('ai', `⚠️ 网络错误：收到非JSON响应<br>无法加载模型列表，请检查网络连接。`);
+            } else if (isNetworkError) {
+                addMessage('ai', `⚠️ 网络错误：Failed to fetch<br>无法加载模型列表，请检查网络连接。`);
             } else {
-                addMessage('ai', `⚠️ 网络错误：${error.message}<br>无法加载模型列表，请检查网络连接。`);
+                addMessage('ai', `⚠️ 模型列表加载失败：${escapeHtml(error.message)}<br>请稍后重试或联系管理员。`);
             }
         }
     }
 
-    // 图片上传
-    const qwenImageUpload = document.getElementById('qwenImageUpload');
-    const qwenImagePreview = document.getElementById('qwenImagePreview');
 
-    qwenImageUpload.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file && file.type.match('image.*')) {
-            selectedImageFile = file;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                qwenImagePreview.innerHTML = `<img src="${event.target.result}" alt="预览">`;
-                qwenImagePreview.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
-        }
-    });
-
-    // 添加消息
+    // 添加消息（内容先转义再插 innerHTML，防 XSS；换行转 <br> 保留排版）
     function addMessage(role, content) {
         const div = document.createElement('div');
         div.className = `qwen-message ${role}-message`;
@@ -221,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="qwen-avatar ${role}-avatar">${role === 'user' ? '👤' : '🤖'}</div>
             <div class="qwen-content">
                 <div class="qwen-name">${role === 'user' ? '您' : 'Qwen AI'}</div>
-                <div class="qwen-text">${content.replace(/\n/g, '<br>')}</div>
+                <div class="qwen-text">${escapeHtml(content).replace(/\n/g, '<br>')}</div>
             </div>
         `;
         qwenMessages.appendChild(div);
@@ -238,9 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error('无法获取认证令牌，请检查网络连接或联系管理员');
         }
 
-        // 确定API基础URL
-        const apiBaseUrl = window.API_CONFIG?.baseURL || 
-                          (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
+        const apiBaseUrl = getApiBaseUrl();
 
         // 构建请求头
         const headers = { 
@@ -309,26 +318,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 发送消息
     async function sendMessage() {
+        // 防重复提交：请求在途时忽略再次点击
+        if (isSending) return;
         const message = qwenInput.value.trim();
-        if (!message && !selectedImageFile) {
+        if (!message) {
             qwenInput.classList.add('shake');
             setTimeout(() => qwenInput.classList.remove('shake'), 500);
             return;
         }
+        isSending = true;
+        qwenSendBtn.disabled = true;
 
         // 添加用户消息
-        let displayContent = message;
-        if (selectedImageFile) {
-            displayContent = `[图片：${selectedImageFile.name}] ${message}`;
-        }
-        addMessage('user', displayContent);
+        addMessage('user', message);
 
         const currentMessage = message;
 
         // 清空输入
         qwenInput.value = '';
-        qwenImagePreview.style.display = 'none';
-        selectedImageFile = null;
 
         // 显示加载状态
         const loadingDiv = document.createElement('div');
@@ -344,13 +351,13 @@ document.addEventListener('DOMContentLoaded', () => {
         qwenMessages.scrollTop = qwenMessages.scrollHeight;
 
         try {
-            const model = qwenModelSelect.value;
-            const temperature = qwenTemperature.value;
+            const model = qwenModelSelect ? qwenModelSelect.value : 'qwen3.5-plus';
+            const temperature = qwenTemperature ? qwenTemperature.value : '0.7';
 
             const data = await callConversationAPI(currentMessage, model, temperature);
 
-            // 移除加载状态
-            qwenMessages.removeChild(loadingDiv);
+            // 移除加载状态（remove() 已删除过也不会抛错）
+            loadingDiv.remove();
 
             if (data.success) {
                 // 更新会话 ID
@@ -359,21 +366,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 添加 AI 响应
                 addMessage('ai', data.response);
 
-                // 更新 Token 统计
-                totalTokens += data.usage.total_tokens || 0;
-                qwenTokens.textContent = totalTokens;
+                // 更新 Token 统计（usage 可能缺失）
+                totalTokens += data.usage?.total_tokens || 0;
+                if (qwenTokens) qwenTokens.textContent = totalTokens;
             } else {
                 addMessage('ai', `抱歉，出现错误：${data.error}`);
             }
 
         } catch (error) {
-            qwenMessages.removeChild(loadingDiv);
+            loadingDiv.remove();
             addMessage('ai', `抱歉，出现错误：${error.message}`);
             
             // 如果是认证相关的错误，提示用户可能需要重新加载页面
             if (error.message.includes('认证令牌') || error.message.includes('Token')) {
                 addMessage('ai', `💡 提示：如果问题持续，请尝试刷新页面重新连接。`);
             }
+        } finally {
+            isSending = false;
+            qwenSendBtn.disabled = false;
         }
     }
 

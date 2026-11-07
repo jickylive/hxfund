@@ -330,8 +330,9 @@ async function buildFrontend() {
         }
 
     } catch (error) {
-        console.error('❌ 前端构建失败:', error.message);
-        console.log('⚠️  继续构建其他部分...');
+        // 构建失败必须终止整个流程：此前只打日志继续跑，CI 显示成功，坏产物照常上线
+        console.error('❌ 前端构建失败，终止构建:', error.message);
+        throw error;
     }
 }
 

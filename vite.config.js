@@ -40,8 +40,7 @@ export default defineConfig({
     },
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'frontend/src/index.html'), // 主入口
-        qwen: resolve(__dirname, 'frontend/src/qwen-ai/index.html') // Qwen AI入口
+        main: resolve(__dirname, 'frontend/src/index.html') // 主入口
       },
       output: {
         entryFileNames: 'js/[name].[hash].js', // 入口文件命名
