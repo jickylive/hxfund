@@ -34,7 +34,7 @@ jobs:
   frontend-deploy:
     name: Deploy Frontend to Aliyun FTP
     runs-on: ubuntu-latest
-    if: ${{ inputs.deploy_frontend != false }}
+    if: ${{ github.event_name == 'push' || inputs.deploy_frontend != false }}
 
     permissions:
       contents: read
@@ -122,7 +122,7 @@ jobs:
   backend-deploy:
     name: Deploy Backend to Aliyun ECS
     runs-on: ubuntu-latest
-    if: ${{ inputs.deploy_backend != false }}
+    if: ${{ github.event_name == 'push' || inputs.deploy_backend != false }}
 
     permissions:
       contents: read
