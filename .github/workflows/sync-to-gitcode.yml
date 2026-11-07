@@ -1,0 +1,48 @@
+# GitHub → GitCode 单向镜像同步
+#
+# 触发：main 分支每次 push（也可在 Actions 页面手动触发）
+# 行为：以 GitHub 为唯一事实源，将 GitCode 的 main 强制对齐到 GitHub 当前状态
+#       （force-with-lease 防止两个工作流并发时互相覆盖）
+#
+# 前置条件（一次性配置）：
+#   1. GitCode：个人设置 → 访问令牌 → 新建访问令牌（勾选代码读写权限）
+#   2. GitHub：本仓库 Settings → Secrets and variables → Actions 添加两个 secret：
+#      - GITCODE_USER  = GitCode 用户名（jickylive）
+#      - GITCODE_TOKEN = 上面生成的访问令牌
+
+name: Sync to GitCode
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-to-gitcode:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Force-align GitCode main
+        env:
+          GITCODE_USER: ${{ secrets.GITCODE_USER }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          set -e
+          if [ -z "$GITCODE_USER" ] || [ -z "$GITCODE_TOKEN" ]; then
+            echo "::error::缺少 GITCODE_USER / GITCODE_TOKEN secret，请到仓库 Settings → Secrets and variables → Actions 配置"
+            exit 1
+          fi
+          git config user.name "jickylive"
+          git config user.email "jickylive@noreply.gitcode.com"
+          git remote add gitcode "https://${GITCODE_USER}:${GITCODE_TOKEN}@gitcode.com/jickylive/hxfund.git"
+          git fetch gitcode main
+          git push --force-with-lease gitcode main:main
+          echo "已同步 $(git rev-parse --short main) → GitCode"
