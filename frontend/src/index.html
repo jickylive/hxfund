@@ -141,6 +141,8 @@
                 <div class="tree-controls">
                     <button class="tree-btn" id="expandAll">展开全部</button>
                     <button class="tree-btn" id="collapseAll">收折全部</button>
+                    <input type="search" class="tree-search" id="treeSearch" placeholder="🔍 搜索族人姓名，如：黄香" aria-label="搜索族人姓名">
+                    <span class="tree-search-count" id="treeSearchCount"></span>
                     <span class="tree-hint">← 横向滚动查看更多 →</span>
                 </div>
 
@@ -364,7 +366,48 @@
                 <div class="tech-stack-card card">
                     <h3 class="bc-subtitle">🏗️ 技术选型与架构</h3>
                     <div class="tech-items" id="techItems">
-                        <!-- JS 渲染 -->
+                        <div class="tech-item">
+                            <div class="tech-item-icon">🖥️</div>
+                            <div>
+                                <div class="tech-item-name">后端 · Node.js + Express</div>
+                                <div class="tech-item-desc">REST API + JWT 认证，三层速率限制保护</div>
+                            </div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-item-icon">🌐</div>
+                            <div>
+                                <div class="tech-item-name">前端 · 原生 JavaScript</div>
+                                <div class="tech-item-desc">Vite 构建，族谱树 / 字辈 / 留言墙 / AI 对话六大模块</div>
+                            </div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-item-icon">🤖</div>
+                            <div>
+                                <div class="tech-item-name">AI · 阿里云百炼 + GitCode AI</div>
+                                <div class="tech-item-desc">Qwen 模型问答，优先使用免费额度</div>
+                            </div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-item-icon">🗄️</div>
+                            <div>
+                                <div class="tech-item-name">数据 · 阿里云 RDS + Redis</div>
+                                <div class="tech-item-desc">MySQL 族谱库（SSL 加密）+ Redis 缓存限流</div>
+                            </div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-item-icon">🔗</div>
+                            <div>
+                                <div class="tech-item-name">存证 · SHA-256 哈希</div>
+                                <div class="tech-item-desc">族谱记录哈希存证，不可篡改、可溯源</div>
+                            </div>
+                        </div>
+                        <div class="tech-item">
+                            <div class="tech-item-icon">☁️</div>
+                            <div>
+                                <div class="tech-item-name">部署 · 阿里云 ECS 容器</div>
+                                <div class="tech-item-desc">Docker + nginx-proxy，GitHub Actions 自动部署</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
