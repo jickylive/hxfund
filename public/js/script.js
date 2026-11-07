@@ -122,9 +122,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // 从服务器代理端点获取新 Token（不暴露 API Key）
             const response = await fetch(`${apiBaseUrl}/api/auth/client-token`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Cache-Control': 'no-cache'
+                // 注意：不要加 'Cache-Control' 请求头——它不是 CORS 安全列表头，
+                // 会触发预检，而服务端 Allow-Headers 不含 cache-control，
+                // 预检失败导致整个请求报 Failed to fetch（2026-11-07 事故）。
+                headers: {
+                    'Content-Type': 'application/json'
                 },
                 credentials: 'include' // 包含cookies和其他认证信息
             });
@@ -175,11 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const apiBaseUrl = getApiBaseUrl();
 
-            const res = await fetch(`${apiBaseUrl}/api/models`, {
-                headers: {
-                    'Cache-Control': 'no-cache'
-                }
-            });
+            const res = await fetch(`${apiBaseUrl}/api/models`);
 
             if (!res.ok) {
                 throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -210,15 +208,17 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('加载模型列表失败:', error.message);
 
             // 区分真正的网络异常与数据格式问题，避免误导用户去查网络
+            // 注意：addMessage 会先转义再把 \n 转 <br>，这里用 \n 换行，
+            // 直接写 <br> 会被转义成字面文字显示出来。
             const isNetworkError = error instanceof TypeError && error.message === 'Failed to fetch';
             if (error.message.includes('404')) {
-                addMessage('ai', `⚠️ 网络错误：API 端点不存在<br>无法加载模型列表，请检查网络连接或联系管理员。`);
+                addMessage('ai', `⚠️ 网络错误：API 端点不存在\n无法加载模型列表，请检查网络连接或联系管理员。`);
             } else if (error.message.includes('Unexpected token <')) {
-                addMessage('ai', `⚠️ 网络错误：收到非JSON响应<br>无法加载模型列表，请检查网络连接。`);
+                addMessage('ai', `⚠️ 网络错误：收到非JSON响应\n无法加载模型列表，请检查网络连接。`);
             } else if (isNetworkError) {
-                addMessage('ai', `⚠️ 网络错误：Failed to fetch<br>无法加载模型列表，请检查网络连接。`);
+                addMessage('ai', `⚠️ 网络错误：Failed to fetch\n无法加载模型列表，请检查网络连接。`);
             } else {
-                addMessage('ai', `⚠️ 模型列表加载失败：${escapeHtml(error.message)}<br>请稍后重试或联系管理员。`);
+                addMessage('ai', `⚠️ 模型列表加载失败：${error.message}\n请稍后重试或联系管理员。`);
             }
         }
     }
@@ -251,10 +251,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const apiBaseUrl = getApiBaseUrl();
 
-        // 构建请求头
-        const headers = { 
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache'
+        // 构建请求头（不加 Cache-Control，见上文 CORS 预检说明）
+        const headers = {
+            'Content-Type': 'application/json'
         };
         if (token) {
             headers['Authorization'] = 'Bearer ' + token;
@@ -288,8 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + newToken,
-                                'Cache-Control': 'no-cache'
+                                'Authorization': 'Bearer ' + newToken
                             },
                             body: JSON.stringify({
                                 message,
