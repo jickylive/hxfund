@@ -326,4 +326,4 @@ export class PWAManager {
 const pwaManager = new PWAManager();
 
 // 导出实例和类
-export { pwaManager, PWAManager };
+export { pwaManager };
