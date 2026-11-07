@@ -37,11 +37,10 @@ function registerServiceWorker() {
                     
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            // 有新版本可用
+                            // 有新版本可用：非阻塞横条提示，不弹 confirm（避免用户点取消后
+                            // 新 SW 一直处于 waiting、旧 SW 继续拦截跨域 API）
                             console.log('[PWA] 新版本已就绪，刷新页面应用更新');
-                            if (confirm('🔄 发现新版本，是否立即刷新？')) {
-                                window.location.reload();
-                            }
+                            showUpdateBanner();
                         }
                     });
                 });
@@ -50,18 +49,35 @@ function registerServiceWorker() {
                 console.error('[PWA] Service Worker 注册失败:', error);
             });
 
-        // 监听控制器变更
+        // 监听控制器变更：新 SW 接管后自动刷新一次，确保新代码生效
+        let swRefreshed = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-            console.log('[PWA] 内容已更新，页面已刷新');
+            if (swRefreshed) return;
+            swRefreshed = true;
+            console.log('[PWA] 新 Service Worker 已接管，刷新页面');
+            window.location.reload();
         });
         
         // 监听来自 SW 的消息
         navigator.serviceWorker.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
                 console.log('[PWA] 服务端通知：有更新可用');
+                showUpdateBanner();
             }
         });
     }
+}
+
+// 新版本横条提示：点「立即刷新」才刷新，不阻塞页面
+function showUpdateBanner() {
+    if (document.getElementById('swUpdateBanner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'swUpdateBanner';
+    banner.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;display:flex;align-items:center;justify-content:center;gap:12px;padding:10px 16px;background:#2d1a0e;color:#fff8f0;font-size:0.9rem;box-shadow:0 -2px 12px rgba(0,0,0,0.25);';
+    banner.innerHTML = '<span>🔄 发现新版本</span><button id="swUpdateReload" style="background:#C8933A;color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:0.9rem;">立即刷新</button><button id="swUpdateDismiss" style="background:transparent;color:#fff8f0;border:1px solid rgba(255,255,255,0.4);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:0.9rem;">稍后</button>';
+    document.body.appendChild(banner);
+    document.getElementById('swUpdateReload').addEventListener('click', () => window.location.reload());
+    document.getElementById('swUpdateDismiss').addEventListener('click', () => banner.remove());
 }
 
 // DOM 加载完成后初始化
@@ -92,9 +108,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 移动端关闭菜单
                 const nav = document.getElementById('mainNav');
-                if (nav && nav.classList.contains('show')) {
-                    nav.classList.remove('show');
-                    document.getElementById('hamburgerBtn')?.classList.remove('active');
+                if (nav && nav.classList.contains('active')) {
+                    nav.classList.remove('active');
+                    document.getElementById('hamburgerBtn')?.classList.remove('open');
                 }
             }
         });
@@ -106,8 +122,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (hamburgerBtn && mainNav) {
         hamburgerBtn.addEventListener('click', () => {
-            mainNav.classList.toggle('show');
-            hamburgerBtn.classList.toggle('active');
+            mainNav.classList.toggle('active');
+            hamburgerBtn.classList.toggle('open');
         });
     }
 
@@ -131,9 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (backToTop) {
         const handleBackToTopScroll = () => {
             if (window.scrollY > 300) {
-                backToTop.classList.add('show');
+                backToTop.classList.add('visible');
             } else {
-                backToTop.classList.remove('show');
+                backToTop.classList.remove('visible');
             }
         };
         
@@ -215,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (modal) {
         window.closeModal = (modalElement = modal) => {
-            modalElement.classList.remove('show');
+            modalElement.classList.remove('open');
             document.body.style.overflow = '';
         };
 
@@ -231,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // ESC 键关闭
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.classList.contains('show')) {
+            if (e.key === 'Escape' && modal.classList.contains('open')) {
                 window.closeModal();
             }
         });
