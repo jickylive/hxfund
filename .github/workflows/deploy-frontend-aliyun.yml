@@ -102,6 +102,7 @@ jobs:
             **/tests/**
             **/scripts/**
             **.md
+            **/*.map
             **.env
           dangerous-clean-slate: false
 
