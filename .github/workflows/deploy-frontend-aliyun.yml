@@ -59,8 +59,11 @@ jobs:
           # 创建 dist 目录
           mkdir -p dist
 
-          # 复制基本文件
-          cp index.html style.css script.js README.md dist/
+          # 复制基本文件（style.css / script.js 不在仓库根目录时跳过）
+          cp index.html dist/
+          cp style.css dist/ 2>/dev/null || echo "No style.css at repo root, skipped"
+          cp script.js dist/ 2>/dev/null || echo "No script.js at repo root, skipped"
+          cp README.md dist/ 2>/dev/null || echo "No README.md, skipped"
 
           # 复制 public 目录内容到 dist
           cp -r public/* dist/
