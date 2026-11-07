@@ -333,6 +333,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // 模块五：宗亲留言墙
     // =========================================
 
+    // API 基础地址：留言墙必须调 api 子域，相对路径会走到 www 主机上 404
+    const apiBaseUrl = window.API_CONFIG?.baseURL ||
+        (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
+
     // Function to fetch and render guest messages from API
     async function renderGuestList() {
         const guestList = document.getElementById('guestList');
@@ -343,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
             guestList.innerHTML = '<div class="guest-loading">加载留言中...</div>';
 
             // Fetch messages from API
-            const response = await fetch('/api/db/guest-messages?page=1&limit=20');
+            const response = await fetch(`${apiBaseUrl}/api/db/guest-messages?page=1&limit=20`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -413,7 +417,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 postBtn.textContent = '提交中...';
 
                 // Submit message to API
-                const response = await fetch('/api/db/guest-messages', {
+                const response = await fetch(`${apiBaseUrl}/api/db/guest-messages`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

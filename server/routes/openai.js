@@ -15,7 +15,9 @@ const SUPPORTED_MODELS = [
   { id: 'glm-5', name: 'GLM-5', description: '支持思考模式' },
   { id: 'glm-4.7', name: 'GLM-4.7', description: '支持思考模式' },
   { id: 'kimi-k2.5', name: 'Kimi K2.5', description: '支持思考模式' },
-  { id: 'Qwen/Qwen3.5-397B-A17B', name: 'Qwen3.5-397B-A17B (GitCode)', description: 'GitCode OpenAI兼容模型' },
+  { id: 'deepseek-ai/DeepSeek-V4-Flash', name: 'DeepSeek-V4-Flash (GitCode)', description: 'GitCode 免费，默认模型' },
+  { id: 'zai-org/GLM-5.1', name: 'GLM-5.1 (GitCode)', description: 'GitCode 免费' },
+  { id: 'Qwen/Qwen3-30B-A3B', name: 'Qwen3-30B-A3B (GitCode)', description: 'GitCode 免费' },
   { id: 'Qwen3-235B-A22B', name: 'Qwen3-235B-A22B (SCNET)', description: 'SCNET OpenAI兼容模型' },
 ];
 
