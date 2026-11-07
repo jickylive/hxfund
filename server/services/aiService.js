@@ -50,7 +50,7 @@ class AIService {
    * 验证并清理提示词
    */
   validateAndCleanPrompt(prompt) {
-    if (!prompt || typeof prompt !== 'string') {
+    if (typeof prompt !== 'string') {
       throw new Error('prompt 必须是非空字符串');
     }
 

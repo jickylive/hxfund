@@ -25,8 +25,8 @@
     "atomcode": "node scripts/atomcode-cli.js",
     "atomcode:init": "node scripts/atomcode-cli.js --init",
     "test": "node tests/test-api.js && node tests/test-auth.js && node tests/test-chat.js",
-    "test:unit": "jest --testPathPattern=tests/services",
-    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:unit": "jest --testPathPatterns=tests/services --forceExit",
+    "test:integration": "jest --testPathPatterns=tests/integration --forceExit",
     "test:coverage": "jest --coverage",
     "lint": "eslint . --ext .js",
     "clean": "rm -rf node_modules package-lock.json && npm install"

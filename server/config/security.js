@@ -152,13 +152,14 @@ function maskSensitiveData(data, type) {
   const str = String(data);
   
   switch (type) {
-    case 'email':
+    case 'email': {
       // example@domain.com -> e***e@domain.com
       const [username, domain] = str.split('@');
       if (username.length <= 2) {
         return `${username[0]}***@${domain}`;
       }
       return `${username[0]}${'*'.repeat(username.length - 2)}${username[username.length - 1]}@${domain}`;
+    }
     
     case 'phone':
       // 13812345678 -> 138****5678

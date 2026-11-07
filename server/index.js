@@ -23,8 +23,6 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const compression = require('compression');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const session = require('express-session');
 const fs = require('fs');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
@@ -37,7 +35,7 @@ const logger = require('./config/logger');
 const httpLogger = require('./middleware/http-logger');
 
 // 引入统一错误处理
-const { errorHandler, notFoundHandler, asyncHandler } = require('./middleware/errorHandler');
+const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 // 引入安全中间件
 const { 
@@ -60,7 +58,6 @@ const {
   initAuthConfig,
   loadAuthConfig,
   generateTokenHandler,
-  generateApiKey,
   generateToken
 } = require('./auth');
 
@@ -290,19 +287,6 @@ function isValidModel(model) {
 function isValidTemperature(temp) {
   const num = parseFloat(temp);
   return !isNaN(num) && num >= 0 && num <= 2;
-}
-
-/**
- * 清理用户输入（防止 XSS）
- */
-function sanitizeInput(str) {
-  if (typeof str !== 'string') return str;
-  return str
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
 }
 
 /**
@@ -1151,7 +1135,12 @@ async function startServer() {
   }
 }
 
-startServer();
+// 仅在直接运行时启动服务器；被 require 时只导出 app（供测试使用）
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app;
 
 // 优雅关闭
 process.on('SIGTERM', async () => {
