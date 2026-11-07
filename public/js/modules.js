@@ -65,6 +65,18 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('modalBio').textContent = member.bio || '暂无详细信息';
         document.getElementById('modalLoc').textContent = member.location || '未知';
 
+        // 区块链存证：按姓名查 bcRecords，查到填哈希，查不到隐藏该区块
+        const bcSection = document.getElementById('modalBcSection');
+        const bcEl = document.getElementById('modalBc');
+        const bcRecords = window.HuangshiData?.bcRecords || window.bcRecords;
+        const record = bcRecords?.find(r => r.name === member.name);
+        if (bcEl && record) {
+            bcEl.textContent = record.hash;
+            if (bcSection) bcSection.style.display = '';
+        } else if (bcSection) {
+            bcSection.style.display = 'none';
+        }
+
         const modalImg = document.getElementById('modalImg');
         if (modalImg) {
             modalImg.alt = member.avatar;
@@ -77,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         }
 
-        modal.classList.add('show');
+        modal.classList.add('open');
         document.body.style.overflow = 'hidden';
     }
 
@@ -237,7 +249,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('pptPrev')?.addEventListener('click', () => {
-        currentSlide = (currentSlide - 1 + window.HuangshiData?.pptSlides.length || window.pptSlides.length) % window.HuangshiData?.pptSlides.length || window.pptSlides.length;
+        const slides = window.HuangshiData?.pptSlides || window.pptSlides;
+        currentSlide = (currentSlide - 1 + slides.length) % slides.length;
         updatePPT();
     });
 

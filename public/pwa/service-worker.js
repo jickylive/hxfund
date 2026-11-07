@@ -157,10 +157,14 @@ function isStaticAsset(pathname) {
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    const cache = await caches.open(DYNAMIC_CACHE);
-    // 仅缓存成功响应
+    // 缓存写入失败（如响应不可缓存、配额满）只记日志，绝不能丢弃刚拿到的新鲜响应
     if (response.ok) {
-      cache.put(request, response.clone());
+      try {
+        const cache = await caches.open(DYNAMIC_CACHE);
+        await cache.put(request, response.clone());
+      } catch (cacheError) {
+        console.log('[SW] 缓存写入失败，忽略:', cacheError.message);
+      }
     }
     return response;
   } catch (error) {
