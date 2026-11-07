@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return parsed && typeof parsed === 'object' ? parsed : {};
         } catch (e) {
             console.warn('本地配置解析失败，已重置:', e.message);
-            try { localStorage.removeItem('qwenConfig'); } catch (_) {}
+            try { localStorage.removeItem('qwenConfig'); } catch (removeError) { console.warn('清除损坏配置失败:', removeError.message); }
             return {};
         }
     }
