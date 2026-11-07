@@ -1,0 +1,5 @@
+node_modules/
+dist/
+public/js/main.*.js
+# database-init-mongodb.js is a MongoDB shell script, not JavaScript
+database/database-init-mongodb.js

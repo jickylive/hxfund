@@ -40,12 +40,10 @@ if (fs.existsSync(PROGRESS_FILE)) {
 // 检查 Git 状态
 console.log('📊 检查 Git 状态...');
 let gitStatus = '';
-let gitDiff = '';
 let gitLog = '';
 
 try {
     gitStatus = execSync('git status --short', { encoding: 'utf-8', cwd: PROJECT_ROOT });
-    gitDiff = execSync('git diff HEAD --stat', { encoding: 'utf-8', cwd: PROJECT_ROOT });
     gitLog = execSync('git log -n 3 --oneline', { encoding: 'utf-8', cwd: PROJECT_ROOT });
 } catch (e) {
     console.log('⚠️  Git 操作失败:', e.message);
@@ -89,7 +87,7 @@ if (lastUpdate === dateStr) {
     );
     
     // 在待解决问题后添加更新
-    const todoMatch = newContent.match(/(## ⚠️ 待解决问题[\s\S]*?)(?=## |\Z)/);
+    const todoMatch = newContent.match(/(## ⚠️ 待解决问题[\s\S]*?)(?=## |$)/);
     if (todoMatch) {
         const insertPos = todoMatch.index + todoMatch[0].length;
         newContent = newContent.slice(0, insertPos) + updateSection + newContent.slice(insertPos);
@@ -136,7 +134,7 @@ if (changedFiles.length > 0 || !progressContent) {
         
         // 推送到 GitCode
         console.log('\n📤 推送到 GitCode...');
-        const pushOrigin = execSync('git push origin main', { 
+        execSync('git push origin main', { 
             cwd: PROJECT_ROOT, 
             encoding: 'utf-8' 
         });
@@ -144,7 +142,7 @@ if (changedFiles.length > 0 || !progressContent) {
         
         // 推送到 GitHub
         console.log('\n📤 推送到 GitHub...');
-        const pushUpstream = execSync('git push upstream main', { 
+        execSync('git push upstream main', { 
             cwd: PROJECT_ROOT, 
             encoding: 'utf-8' 
         });

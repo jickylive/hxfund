@@ -43,7 +43,7 @@ function httpLogger(req, res, next) {
       level = 'warn';
     }
 
-    logger.http(`${req.method} ${req.url}`, {
+    logger[level](`${req.method} ${req.url}`, {
       request: requestInfo,
       response: responseInfo,
     });

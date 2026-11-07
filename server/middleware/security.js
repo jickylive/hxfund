@@ -4,7 +4,7 @@
  */
 
 const crypto = require('crypto');
-const { maskObject, generateCSRFToken, verifyCSRFToken } = require('../config/security');
+const { maskObject } = require('../config/security');
 const logger = require('../config/logger');
 
 /**

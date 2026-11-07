@@ -295,7 +295,6 @@ function printModels(currentModel) {
     const isCurrent = m.id === currentModel;
     const isDefault = m.default;
     const icon = isCurrent ? ' > ' : '   ';
-    const tag = isCurrent ? ' [当前]' : '';
     const defaultTag = isDefault ? ' [默认]' : '';
     console.log(`${icon}${m.id.padEnd(40)} ${m.name.padEnd(20)} ${defaultTag.padEnd(6)} ${m.description}`);
   });
@@ -445,6 +444,7 @@ async function interactiveMode(config) {
         tokenStats.total += result.usage.total_tokens || 0;
         tokenStats.prompt += result.usage.prompt_tokens || 0;
         tokenStats.completion += result.usage.completion_tokens || 0;
+        totalTime[Date.now()] = result.elapsed || 0;
 
         // 显示输出
         console.log('\n  ' + '─'.repeat(60));
@@ -467,6 +467,9 @@ async function interactiveMode(config) {
 
   ask();
 }
+
+// 累计每次调用的响应耗时（毫秒），键为调用时间戳
+const totalTime = {};
 
 function getTotalTime() {
   return Object.values(totalTime).reduce((sum, t) => sum + t, 0).toFixed(0);
@@ -641,10 +644,11 @@ async function main() {
       break;
 
     case '--models':
-    case '-m':
+    case '-m': {
       const modelsConfig = loadConfig();
       printModels(modelsConfig.model);
       break;
+    }
 
     case '--status':
     case '-s':
@@ -657,7 +661,7 @@ async function main() {
       break;
 
     // 默认：单次问答
-    default:
+    default: {
       const config = loadConfig();
       const question = args.join(' ');
       if (!question.trim()) {
@@ -668,6 +672,7 @@ async function main() {
       }
       await singleQuestionMode(config, question);
       break;
+    }
   }
 }
 

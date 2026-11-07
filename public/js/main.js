@@ -219,20 +219,20 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.style.overflow = '';
         };
 
-        closeBtn?.addEventListener('click', () => closeModal());
-        closeBtn2?.addEventListener('click', () => closeModal());
+        closeBtn?.addEventListener('click', () => window.closeModal());
+        closeBtn2?.addEventListener('click', () => window.closeModal());
         
         // 点击模态框外部关闭
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
-                closeModal();
+                window.closeModal();
             }
         });
 
         // ESC 键关闭
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && modal.classList.contains('show')) {
-                closeModal();
+                window.closeModal();
             }
         });
     }

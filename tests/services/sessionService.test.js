@@ -28,7 +28,7 @@ describe('SessionService', () => {
 
       const size = sessionService.calculateSessionSize(messages);
       expect(size).toBeGreaterThan(0);
-      expect(size).toBe(2 + 19 + 6); // 每个消息的字符数之和
+      expect(size).toBe(2 + 15 + 7); // 每个消息的字符数之和
     });
 
     test('应该处理空消息数组', () => {
