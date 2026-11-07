@@ -100,6 +100,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 treeRoot.querySelectorAll('.node-expand').forEach(el => el.textContent = '▼');
             });
+
+            // 族人姓名搜索：输入即筛，高亮匹配卡片并滚动到首个结果
+            const treeSearch = document.getElementById('treeSearch');
+            const treeSearchCount = document.getElementById('treeSearchCount');
+            treeSearch?.addEventListener('input', () => {
+                const q = treeSearch.value.trim();
+                const cards = treeRoot.querySelectorAll('.tree-node-card');
+                cards.forEach(c => c.classList.remove('search-match'));
+                if (!q) {
+                    if (treeSearchCount) treeSearchCount.textContent = '';
+                    return;
+                }
+                // 先展开全部，再匹配，避免结果藏在折叠分支里
+                treeRoot.querySelectorAll('.tree-node-children').forEach(el => el.style.display = 'flex');
+                let matches = 0;
+                let first = null;
+                cards.forEach(c => {
+                    const name = c.querySelector('.node-name')?.textContent || '';
+                    const title = c.querySelector('.node-title')?.textContent || '';
+                    if (name.includes(q) || title.includes(q)) {
+                        c.classList.add('search-match');
+                        matches++;
+                        if (!first) first = c;
+                    }
+                });
+                if (treeSearchCount) treeSearchCount.textContent = matches ? `找到 ${matches} 位` : '未找到';
+                if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+            });
         }
     }
 
@@ -169,9 +197,9 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="ppt-slide" data-idx="${index}">
                 <div class="ppt-slide-inner">
                     <div class="ppt-deco"></div>
-                    <div class="ppt-icon">${slide.icon}</div>
-                    <h3 class="ppt-title">${slide.title}</h3>
-                    <p class="ppt-subtitle">${slide.subtitle}</p>
+                    <div class="ppt-slide-icon">${slide.icon}</div>
+                    <h3 class="ppt-slide-title">${slide.title}</h3>
+                    <p class="ppt-slide-subtitle">${slide.subtitle}</p>
                     <div class="ppt-slide-content">${slide.content}</div>
                     ${slide.tags ? `
                     <div class="ppt-slide-tags">
