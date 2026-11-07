@@ -98,6 +98,47 @@ function processCSS() {
     };
 }
 
+// 识别字符串字面量的注释剥离：只删字符串外的 // 与 /* */ 注释。
+// 朴素正则会把 'http://...'、'https://...' 里的 // 当注释删掉，
+// 截断字符串产出非法 JS（2026-11-07 事故根因）。
+function stripCommentsSafe(code) {
+    let out = '';
+    let i = 0;
+    let inStr = null; // "'"、'"' 或 '`'
+    let escaped = false;
+    while (i < code.length) {
+        const c = code[i];
+        const next = code[i + 1];
+        if (inStr) {
+            out += c;
+            if (escaped) escaped = false;
+            else if (c === '\\') escaped = true;
+            else if (c === inStr) inStr = null;
+            i++;
+            continue;
+        }
+        if (c === "'" || c === '"' || c === '`') { inStr = c; out += c; i++; continue; }
+        if (c === '/' && next === '/') { while (i < code.length && code[i] !== '\n') i++; continue; }
+        if (c === '/' && next === '*') {
+            i += 2;
+            while (i < code.length && !(code[i] === '*' && code[i + 1] === '/')) i++;
+            i += 2;
+            continue;
+        }
+        out += c;
+        i++;
+    }
+    return out;
+}
+
+// 校验一段代码是否语法合法（new Function 会把顶层 return 判错，
+// 但前端这批文件均为普通浏览器脚本，无顶层 return / import / await，
+// 用作压缩产物的兜底校验足够）。
+function isValidJS(code) {
+    try { new Function(code); return true; }
+    catch { return false; }
+}
+
 // 压缩 JS（使用 terser）
 async function processJS() {
     console.log('\n📄 处理 JS 文件...');
@@ -134,6 +175,9 @@ async function processJS() {
                 }
             });
 
+            if (!isValidJS(minified.code)) {
+                throw new Error('terser 产物语法非法，触发降级');
+            }
             fs.writeFileSync(minDest, minified.code, 'utf-8');
             console.log(`  ✓ js/${file.replace('.js', '.min.js')} (${(minified.code.length / 1024).toFixed(2)} KB)`);
 
@@ -145,18 +189,26 @@ async function processJS() {
             });
         } catch (error) {
             console.error(`  ✗ 压缩失败 js/${file}: ${error.message}`);
-            // 降级到简单压缩
-            const simpleMinified = js
-                .replace(/\/\*[\s\S]*?\*\//g, '')
-                .replace(/\/\/.*$/gm, '')
-                .trim();
-            fs.writeFileSync(minDest, simpleMinified, 'utf-8');
-            stats.push({
-                file,
-                original: js.length,
-                minified: simpleMinified.length,
-                savings: ((1 - simpleMinified.length / js.length) * 100).toFixed(1)
-            });
+            // 降级到简单压缩：必须识别字符串字面量，绝不能把 'http://...' 里的 //
+            // 当成注释删掉（2026-11-07 教训：正则 .replace(/\/\/.*$/gm,'') 会截断
+            // URL 字符串，产出语法错误的 .min.js，导致整站 JS 瘫痪）。
+            // 注意：不要把空白折叠成单行——行内注释 // 依赖换行结束，折叠后会把
+            // 剩余整段代码都注释掉（同样产出非法 JS）。
+            const simpleMinified = stripCommentsSafe(js).trim();
+            if (isValidJS(simpleMinified)) {
+                fs.writeFileSync(minDest, simpleMinified, 'utf-8');
+                stats.push({
+                    file,
+                    original: js.length,
+                    minified: simpleMinified.length,
+                    savings: ((1 - simpleMinified.length / js.length) * 100).toFixed(1)
+                });
+            } else {
+                // 降级产物仍非法时宁可不压缩：直接写原文件，保证页面可用
+                console.error(`  ⚠ 降级压缩结果非法，改用未压缩原文件 js/${file}`);
+                fs.writeFileSync(minDest, js, 'utf-8');
+                stats.push({ file, original: js.length, minified: js.length, savings: '0.0' });
+            }
         }
     }
 
