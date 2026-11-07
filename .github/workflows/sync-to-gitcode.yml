@@ -30,6 +30,22 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      - name: Secret diagnostic
+        env:
+          GITCODE_USER: ${{ secrets.GITCODE_USER }}
+          GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+        run: |
+          if [ -n "$GITCODE_USER" ]; then
+            echo "GITCODE_USER: present"
+          else
+            echo "::error::diagnostic: GITCODE_USER 在工作流上下文中为空（secret 未配置、名字不对、或配置在了 Environments 标签页）"
+          fi
+          if [ -n "$GITCODE_TOKEN" ]; then
+            echo "GITCODE_TOKEN: present"
+          else
+            echo "::error::diagnostic: GITCODE_TOKEN 在工作流上下文中为空（secret 未配置、名字不对、或配置在了 Environments 标签页）"
+          fi
+
       - name: Force-align GitCode main
         env:
           GITCODE_USER: ${{ secrets.GITCODE_USER }}
