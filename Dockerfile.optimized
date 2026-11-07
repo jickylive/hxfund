@@ -55,7 +55,7 @@ COPY --from=frontend-builder /app/frontend/dist ./public
 
 # 复制应用代码
 COPY server/ ./server/
-COPY qwen-code.js ./qwen-code.js
+COPY scripts/qwen-code.js ./scripts/qwen-code.js
 COPY index.html ./index.html
 
 # 设置文件权限
