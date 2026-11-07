@@ -219,7 +219,7 @@ async function deployToOSS(configFile) {
     
     console.log('\\n步骤 4: 验证部署...');
     console.log('部署完成！请验证以下内容：');
-    console.log(`- 检查网站是否正常访问 (https://${bucketName}.${endpoint.replace('oss-', '')})`);
+    console.log(`- 检查网站是否正常访问 (https://${BUCKET_NAME}.${ENDPOINT.replace('oss-', '')})`);
     console.log('- 验证CSS和JS文件是否正确加载');
     console.log('- 测试所有功能是否正常工作');
     
