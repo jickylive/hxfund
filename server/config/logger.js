@@ -75,7 +75,7 @@ function sanitize(obj) {
   const sanitized = Array.isArray(obj) ? [] : {};
 
   for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
       const lowerKey = key.toLowerCase();
       if (sensitiveKeys.some(sensitive => lowerKey.includes(sensitive))) {
         sanitized[key] = '***REDACTED***';
@@ -136,5 +136,6 @@ const logger = winston.createLogger({
   exitOnError: false,
 });
 
-// 导出
+// 导出（挂载 sanitize 工具，供调用方在记录前脱敏）
+logger.sanitize = sanitize;
 module.exports = logger;
