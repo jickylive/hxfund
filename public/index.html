@@ -278,8 +278,8 @@
                         </div>
                     </div>
 
-                    <!-- 配置面板（隐藏） -->
-                    <div class="qwen-config-panel card" style="display: none;">
+                    <!-- 配置面板 -->
+                    <div class="qwen-config-panel card">
                         <h3 class="bc-subtitle">⚙️ 参数配置</h3>
                         <div class="qwen-form">
                             <div class="form-group">
@@ -306,10 +306,6 @@
                                 <label for="qwenTemperature">温度 (Creativity)</label>
                                 <input type="range" id="qwenTemperature" min="0" max="1" step="0.1" value="0.7">
                                 <span id="tempValue">0.7</span>
-                            </div>
-                            <div class="form-group">
-                                <label for="qwenApiKey">API 密钥</label>
-                                <input type="password" id="qwenApiKey" placeholder="输入您的 API 密钥">
                             </div>
                             <button id="qwenSaveConfig" class="btn-primary" style="width:100%;margin-top:10px;">
                                 <span>保存配置</span>
