@@ -267,7 +267,7 @@ body::before {
 
 /* ======================== 通用组件 ======================== */
 .section {
-    padding: 100px 0 80px;
+    padding: 64px 0 56px;
     position: relative;
     background: transparent;
 }
