@@ -187,8 +187,8 @@ window.pptSlides = [
     // 公开 API
     return {
         familyTreeData,
-        generationPoems,
-        pptSlides,
+        generationPoems: window.generationPoems,
+        pptSlides: window.pptSlides,
         bcRecords,
         guestMessages,
         // 版本信息
