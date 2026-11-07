@@ -106,6 +106,7 @@ jobs:
           **.md
           **.env
           **/*.map
+          **/*.ttf
         dangerous-clean-slate: false
 
     - name: Notify deployment
