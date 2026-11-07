@@ -27,7 +27,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 
 // ============================================
 // 配置管理
@@ -35,7 +35,6 @@ const { execSync, spawn } = require('child_process');
 
 const CONFIG_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.qwen-code');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
-const QWEN_SETTINGS_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.qwen', 'settings.json');
 
 const DEFAULT_CONFIG = {
   apiKey: '',
