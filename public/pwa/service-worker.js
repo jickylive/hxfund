@@ -10,7 +10,7 @@
  */
 
 // 版本号（每次更新时递增）
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `dynamic-${CACHE_VERSION}`;
 
@@ -101,6 +101,14 @@ self.addEventListener('fetch', (event) => {
 
   // 仅处理 HTTP/HTTPS 请求
   if (request.method !== 'GET' || !url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // 只拦截同源请求：跨域 API（如 api.hxfund.cn）直接走网络，不经过 SW。
+  // 原因：SW 拦截跨域 GET 时，networkFirst 里的 cache.put 可能因跨域响应
+  // 缓存限制而抛错，导致整个请求失败（页面内 fetch 报 Failed to fetch，
+  // 而直接访问接口域名却正常）。同源静态资源与页面仍由 SW 接管。
+  if (url.origin !== self.location.origin) {
     return;
   }
 
