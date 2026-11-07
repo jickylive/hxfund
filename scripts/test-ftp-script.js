@@ -15,7 +15,7 @@ try {
 
 // 尝试加载 basic-ftp (即使不存在也不报错)
 try {
-    const ftp = require('basic-ftp');
+    require('basic-ftp');
     console.log('✅ basic-ftp module loaded successfully');
 } catch (e) {
     console.log('⚠️ basic-ftp module not found - this is expected if not installed globally');
