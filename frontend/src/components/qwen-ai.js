@@ -232,8 +232,6 @@ class QwenAI {
     }
     this.addMessage('user', displayContent);
 
-    // 保存当前图片引用
-    const currentImage = this.selectedImageFile;
     const currentMessage = message;
 
     // 清空输入
