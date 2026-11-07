@@ -223,6 +223,14 @@ function enhancedRateLimit(options = {}) {
   const requests = new Map();
   
   return (req, res, next) => {
+    // 跳过公开端点（健康检查、文档、模型列表），避免 Docker 健康检查
+    // 与高频公开查询触发限流导致容器被判 unhealthy（/api/health 每 30s 一次，
+    // 15 分钟即达 anonymous 用户 30 次上限）
+    const skipPaths = ['/api/health', '/api/docs', '/api/models'];
+    if (skipPaths.includes(req.path)) {
+      return next();
+    }
+
     const now = Date.now();
     const ip = req.ip || req.connection.remoteAddress;
     const userId = req.user?.id || req.session?.userId || 'anonymous';
