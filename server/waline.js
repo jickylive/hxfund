@@ -16,7 +16,6 @@ const { v4: uuidv4 } = require('uuid');
 const WALINE_VERSION = '1.0.0';
 
 // 常量定义
-const AVAILABLE_META = ['nick', 'mail', 'link'];
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 50;
 const COMMENT_MAX_LENGTH = 1000;
@@ -32,17 +31,6 @@ const db = {
 const md5 = (str) => crypto.createHash('md5').update(str).digest('hex');
 
 const generateId = () => uuidv4().replace(/-/g, '');
-
-const timeAgo = (timestamp) => {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
-  
-  if (seconds < 60) return '刚刚';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时前`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)} 天前`;
-  
-  return new Date(timestamp).toLocaleDateString('zh-CN');
-};
 
 const sanitizeInput = (str) => {
   if (typeof str !== 'string') return str;
@@ -77,7 +65,7 @@ router.use((req, res, next) => {
  */
 router.get('/article', async (req, res) => {
   try {
-    const { path, type = ['time'], lang = 'zh-CN' } = req.query;
+    const { path, type = ['time'] } = req.query;
     
     if (!path) {
       return res.status(400).json({
@@ -126,7 +114,7 @@ router.get('/article', async (req, res) => {
  */
 router.post('/article', async (req, res) => {
   try {
-    const { path, type = 'time', action = 'inc', lang = 'zh-CN' } = req.body;
+    const { path, type = 'time', action = 'inc' } = req.body;
     
     if (!path) {
       return res.status(400).json({
@@ -173,7 +161,6 @@ router.get('/comment', async (req, res) => {
       path, 
       page = 1, 
       pageSize = DEFAULT_PAGE_SIZE,
-      lang = 'zh-CN',
       sortBy = 'latest',
       type = 'list'
     } = req.query;
@@ -271,7 +258,7 @@ router.get('/comment', async (req, res) => {
  */
 router.post('/comment', async (req, res) => {
   try {
-    const { comment, lang = 'zh-CN' } = req.body;
+    const { comment } = req.body;
 
     if (!comment) {
       return res.status(400).json({
@@ -288,11 +275,7 @@ router.post('/comment', async (req, res) => {
       comment: content,
       pid = null,
       rid = null,
-      ua = '',
-      url = '',
-      avatar = '',
-      linkIcon = '',
-      type = 'comment'
+      ua = ''
     } = comment;
 
     // 验证必填字段
@@ -503,7 +486,7 @@ router.post('/comment/:id/like', async (req, res) => {
  */
 router.get('/user', async (req, res) => {
   try {
-    const { page = 1, pageSize = 10, lang = 'zh-CN' } = req.query;
+    const { page = 1, pageSize = 10 } = req.query;
     
     const pageNum = parseInt(page) || 1;
     const size = Math.min(parseInt(pageSize) || 10, MAX_PAGE_SIZE);
