@@ -63,19 +63,20 @@ console.log(`   源目录: ${SOURCE_DIR}`);
 console.log(`   目标目录: ${TARGET_DIR}`);
 console.log('');
 
+// 定义一个函数来安全地转义可能包含特殊字符的字符串
+function escapeForLftp(str) {
+    // 对于lftp命令，我们需要特别小心处理特殊字符
+    // 将双引号替换为转义形式，以及其他可能导致解析问题的字符
+    return str
+        .replace(/\\/g, '\\\\')  // 转义反斜杠
+        .replace(/"/g, '\\"')    // 转义双引号
+        .replace(/\$/g, '\\$')   // 转义美元符号
+        .replace(/`/g, '\\`');   // 转义反引号
+}
+
 try {
     console.log('🔌 正在连接到FTP服务器并上传文件...');
     
-    // 定义一个函数来安全地转义可能包含特殊字符的字符串
-    function escapeForLftp(str) {
-        // 对于lftp命令，我们需要特别小心处理特殊字符
-        // 将双引号替换为转义形式，以及其他可能导致解析问题的字符
-        return str
-            .replace(/\\/g, '\\\\')  // 转义反斜杠
-            .replace(/"/g, '\\"')    // 转义双引号
-            .replace(/\$/g, '\\$')   // 转义美元符号
-            .replace(/`/g, '\\`');   // 转义反引号
-    }
     
     // 构建 lftp 命令 - 使用转义后的用户名和密码
     const escapedUser = escapeForLftp(ftpConfig.user);
@@ -106,7 +107,7 @@ try {
         fs.writeFileSync(tempScriptPath, lftpCommand);
         
         // 使用 -f 参数执行脚本文件，这样密码不会出现在命令行参数中
-        const result = execSync(`lftp -f "${tempScriptPath}"`, {
+        execSync(`lftp -f "${tempScriptPath}"`, {
             encoding: 'utf-8',
             stdio: 'inherit' // 直接继承父进程的stdio，这样能看到实时进度
         });
