@@ -155,6 +155,7 @@ jobs:
             **/.git*/**
             **/node_modules/**
             **/*.map
+            **/*.ttf
           dangerous-clean-slate: false
 
       - name: ✅ 前端部署完成
@@ -196,6 +197,7 @@ jobs:
             **/.git*/**
             **/node_modules/**
             **/*.map
+            **/*.ttf
           dangerous-clean-slate: false
 
       - name: ✅ 博客部署完成
