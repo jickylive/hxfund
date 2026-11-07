@@ -173,9 +173,6 @@ class DatabaseManager {
 
     const keys = Object.keys(data[0]);
     const values = data.map(row => keys.map(key => row[key]));
-    const placeholders = keys.map(() => '?').join(', ');
-
-    const sql = `INSERT INTO ${table} (${keys.join(', ')}) VALUES (${placeholders})`;
     
     // 使用 multiStatements 进行批量插入
     const insertValues = values.map(v => `(${keys.map(() => '?').join(', ')})`).join(', ');
@@ -279,7 +276,7 @@ class DatabaseManager {
         };
       }
 
-      const [rows] = await this.pool.execute('SELECT 1 AS health');
+      await this.pool.execute('SELECT 1 AS health');
       
       return {
         status: 'ok',
