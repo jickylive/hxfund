@@ -33,7 +33,7 @@ database/
     └── dump-schema.js       # 结构导出工具（只读，可重复执行）
 ```
 
-## 🗄️ 表清单（9 张）
+## 🗄️ 表清单（11 张）
 
 | # | 表 | 用途 | 生产估算行数 | 外键 |
 |---|---|---|---|---|
@@ -46,6 +46,8 @@ database/
 | 7 | `blockchain_records` | 区块链存证记录 | 3 | — |
 | 8 | `guest_messages` | 宗亲留言（含楼中楼回复） | 11 | —（parent_id 逻辑关联） |
 | 9 | `system_config` | 系统配置键值 | 7 | — |
+| 10 | `waline_comments` | Waline 评论（2026-11-08 新增，此前为进程内存） | 0 | —（pid/rid 逻辑关联） |
+| 11 | `waline_article_stats` | Waline 文章统计（浏览量/评论数） | 0 | — |
 
 ## 🔗 数据模型
 
