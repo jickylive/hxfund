@@ -96,41 +96,22 @@ router.get('/members/:parentId/children', async (req, res) => {
   }
 });
 
-// 新增成员（需要认证）
-router.post('/members', authenticateToken(), async (req, res) => {
-  try {
-    const dbOk = await checkDbAvailable();
-    if (dbOk) {
-      const { name, generation, parent_id, level, sort_order, birth_year, status } = req.body;
-      const result = await dbManager.query(
-        'INSERT INTO family_members (name, generation, parent_id, level, sort_order, birth_year, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [name, generation, parent_id, level, sort_order, birth_year, status || '待确认']
-      );
-      return res.status(201).json({ success: true, data: { id: result.insertId, name, generation }, message: '成员添加成功' });
-    }
-    res.status(201).json({ success: true, data: { id: Date.now(), ...req.body }, message: '成员添加成功（模拟数据）', source: 'mock' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+// 新增成员：写接口未实现（501）
+// 旧 INSERT 的字段（generation/birth_year/status）在生产 family_members 表中不存在，
+// 对真实库必然报错；DB 异常时又返回假成功——两种行为都误导调用方。
+// 写 API 待按现行表结构重新实现，当前仅提供读接口。
+router.post('/members', authenticateToken(), (req, res) => {
+  res.status(501).json({ success: false, error: '成员创建未实现（写接口待重新实现）', code: 'NOT_IMPLEMENTED' });
 });
 
-// 更新成员（需要认证）
-router.put('/members/:id', authenticateToken(), async (req, res) => {
-  try {
-    const { name, generation, birth_year, status } = req.body;
-    res.json({ success: true, message: '成员信息已更新', data: { id: req.params.id, name, generation, birth_year, status } });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+// 更新成员：写接口未实现（501），此前不写库直接返回成功（假成功）
+router.put('/members/:id', authenticateToken(), (req, res) => {
+  res.status(501).json({ success: false, error: '成员更新未实现（写接口待重新实现）', code: 'NOT_IMPLEMENTED' });
 });
 
-// 删除成员（需要认证）
-router.delete('/members/:id', authenticateToken(), async (req, res) => {
-  try {
-    res.json({ success: true, message: `成员 ${req.params.id} 已删除` });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+// 删除成员：写接口未实现（501），此前不删库直接返回成功（假成功）
+router.delete('/members/:id', authenticateToken(), (req, res) => {
+  res.status(501).json({ success: false, error: '成员删除未实现（写接口待重新实现）', code: 'NOT_IMPLEMENTED' });
 });
 
 // ==================== 字辈诗 ====================
@@ -149,13 +130,9 @@ router.get('/poems', async (req, res) => {
   }
 });
 
-// 新增字辈诗（需要认证）
-router.post('/poems', authenticateToken(), async (req, res) => {
-  try {
-    res.status(201).json({ success: true, data: { ...req.body, id: Date.now() }, message: '字辈诗添加成功（模拟数据）', source: 'mock' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+// 新增字辈诗：写接口未实现（501），此前返回假成功（模拟数据，不落库）
+router.post('/poems', authenticateToken(), (req, res) => {
+  res.status(501).json({ success: false, error: '字辈诗创建未实现（写接口待重新实现）', code: 'NOT_IMPLEMENTED' });
 });
 
 // ==================== 项目幻灯片 ====================
@@ -174,13 +151,9 @@ router.get('/slides', async (req, res) => {
   }
 });
 
-// 新增幻灯片（需要认证）
-router.post('/slides', authenticateToken(), async (req, res) => {
-  try {
-    res.status(201).json({ success: true, data: { ...req.body, id: Date.now() }, message: '幻灯片添加成功（模拟数据）', source: 'mock' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+// 新增幻灯片：写接口未实现（501），此前返回假成功（模拟数据，不落库）
+router.post('/slides', authenticateToken(), (req, res) => {
+  res.status(501).json({ success: false, error: '幻灯片创建未实现（写接口待重新实现）', code: 'NOT_IMPLEMENTED' });
 });
 
 // ==================== 留言板 ====================
@@ -199,30 +172,16 @@ router.get('/messages', async (req, res) => {
   }
 });
 
-// 提交留言
-router.post('/messages', async (req, res) => {
-  try {
-    const { name, email, content, avatar } = req.body;
-    if (!name || !content) {
-      return res.status(400).json({ success: false, error: '缺少必填字段: name, content', code: 'MISSING_FIELDS' });
-    }
-    const dbOk = await checkDbAvailable();
-    if (dbOk) {
-      const result = await dbManager.query(
-        'INSERT INTO guest_messages (name, email, content, avatar, is_approved) VALUES (?, ?, ?, ?, 0)',
-        [name, email, content, avatar || '😊']
-      );
-      return res.status(201).json({ success: true, data: { id: result.insertId, ...req.body }, message: '留言提交成功，待审核' });
-    }
-    res.status(201).json({
-      success: true,
-      data: { id: Date.now(), name, email, content, avatar: avatar || '😊', is_approved: 0 },
-      message: '留言提交成功（模拟数据），待审核',
-      source: 'mock'
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+// 提交留言：写接口未实现（501）
+// 旧 INSERT 的字段（name/email/avatar/is_approved）在生产 guest_messages 表中不存在
+// （现行表为 user_name/location/is_public/is_verified），对真实库必然报错。
+// 留言墙写入口是 POST /api/db/guest-messages（带待审核流程）。
+router.post('/messages', (req, res) => {
+  res.status(501).json({
+    success: false,
+    error: '留言提交未实现，请使用 POST /api/db/guest-messages',
+    code: 'NOT_IMPLEMENTED'
+  });
 });
 
 // ==================== 区块链存证 ====================
@@ -241,13 +200,9 @@ router.get('/blockchain', async (req, res) => {
   }
 });
 
-// 新增区块链记录（需要认证）
-router.post('/blockchain', authenticateToken(), async (req, res) => {
-  try {
-    res.status(201).json({ success: true, data: { ...req.body, id: Date.now() }, message: '区块链存证添加成功（模拟数据）', source: 'mock' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+// 新增区块链记录：写接口未实现（501），此前返回假成功（模拟数据，不落库）
+router.post('/blockchain', authenticateToken(), (req, res) => {
+  res.status(501).json({ success: false, error: '区块链存证创建未实现（写接口待重新实现）', code: 'NOT_IMPLEMENTED' });
 });
 
 // ==================== 系统配置 ====================
@@ -261,13 +216,9 @@ router.get('/config/:key', async (req, res) => {
   }
 });
 
-// 更新系统配置（需要认证）
-router.put('/config/:key', authenticateToken(), async (req, res) => {
-  try {
-    res.json({ success: true, message: '系统配置更新成功（模拟数据）', source: 'mock' });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
+// 更新系统配置：写接口未实现（501），此前返回假成功（模拟数据，不落库）
+router.put('/config/:key', authenticateToken(), (req, res) => {
+  res.status(501).json({ success: false, error: '系统配置更新未实现（写接口待重新实现）', code: 'NOT_IMPLEMENTED' });
 });
 
 // ==================== 健康检查 ====================
