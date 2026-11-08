@@ -7,9 +7,9 @@ const aiService = require('../../server/services/aiService');
 describe('AIService', () => {
   describe('模型验证', () => {
     test('应该验证有效的模型ID', () => {
-      expect(aiService.isValidModel('qwen3.5-plus')).toBe(true);
-      expect(aiService.isValidModel('qwen3-max-2026-01-23')).toBe(true);
-      expect(aiService.isValidModel('glm-5')).toBe(true);
+      expect(aiService.isValidModel('deepseek-ai/DeepSeek-V4-Flash')).toBe(true);
+      expect(aiService.isValidModel('Qwen/Qwen3-32B')).toBe(true);
+      expect(aiService.isValidModel('zai-org/GLM-5.1')).toBe(true);
     });
 
     test('应该拒绝无效的模型ID', () => {
@@ -90,12 +90,12 @@ describe('AIService', () => {
       const models = aiService.getSupportedModels();
       const defaultModel = models.find(m => m.default);
       expect(defaultModel).toBeDefined();
-      expect(defaultModel.id).toBe('qwen3.5-plus');
+      expect(defaultModel.id).toBe('deepseek-ai/DeepSeek-V4-Flash');
     });
 
     test('应该返回默认模型ID', () => {
       const defaultModel = aiService.getDefaultModel();
-      expect(defaultModel).toBe('qwen3.5-plus');
+      expect(defaultModel).toBe('deepseek-ai/DeepSeek-V4-Flash');
     });
   });
 
