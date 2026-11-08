@@ -274,39 +274,14 @@
                                     <span>Token 用量:</span>
                                     <span id="qwenTokens">0</span>
                                 </div>
+                                <div class="qwen-model">
+                                    <span>模型:</span>
+                                    <span id="qwenModelLabel">加载中...</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 配置面板 -->
-                    <div class="qwen-config-panel card">
-                        <h3 class="bc-subtitle">⚙️ 参数配置</h3>
-                        <div class="qwen-form">
-                            <div class="form-group">
-                                <label for="qwenModelSelect">选择模型</label>
-                                <select id="qwenModelSelect">
-                                    <optgroup label="GitCode 免费模型">
-                                        <option value="deepseek-ai/DeepSeek-V4-Flash">DeepSeek V4 Flash（默认）</option>
-                                        <option value="Qwen/Qwen3-32B">Qwen3 32B</option>
-                                        <option value="Qwen/Qwen3-30B-A3B">Qwen3 30B A3B</option>
-                                        <option value="Qwen/Qwen3-30B-A3B-Instruct-2507">Qwen3 30B A3B Instruct</option>
-                                        <option value="Qwen/Qwen3-30B-A3B-Thinking-2507">Qwen3 30B A3B Thinking（思考模式）</option>
-                                        <option value="Qwen/Qwen3-4B-Instruct-2507">Qwen3 4B Instruct（轻量快速）</option>
-                                        <option value="Qwen/Qwen2.5-VL-72B">Qwen2.5 VL 72B（多模态）</option>
-                                        <option value="zai-org/GLM-5.1">GLM-5.1</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="qwenTemperature">温度 (Creativity)</label>
-                                <input type="range" id="qwenTemperature" min="0" max="1" step="0.1" value="0.7">
-                                <span id="tempValue">0.7</span>
-                            </div>
-                            <button id="qwenSaveConfig" class="btn-primary" style="width:100%;margin-top:10px;">
-                                <span>保存配置</span>
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </section>

@@ -18,6 +18,18 @@ describe('API 集成测试', () => {
       expect(response.body).toHaveProperty('service');
       expect(response.body).toHaveProperty('version');
     });
+
+    test('GET /api/health 不得泄露 API Key 的任何片段', async () => {
+      const response = await request(app)
+        .get('/api/health')
+        .set('User-Agent', 'Mozilla/5.0');
+
+      expect(response.status).toBe(200);
+      // 之前返回 apiKey 前 8 位是密钥泄露；现在只允许布尔值
+      expect(response.body.config).not.toHaveProperty('apiKeyPrefix');
+      expect(response.body.config).toHaveProperty('apiKeyConfigured');
+      expect(typeof response.body.config.apiKeyConfigured).toBe('boolean');
+    });
   });
 
   describe('模型列表', () => {

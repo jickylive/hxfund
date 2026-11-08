@@ -759,7 +759,9 @@ app.get('/api/health', async (req, res) => {
       cliPath: CLI_PATH,
       model: cliConfig?.model || 'deepseek-ai/DeepSeek-V4-Flash',
       baseURL: cliConfig?.baseURL || null,
-      apiKeyPrefix: cliConfig?.apiKey ? `${cliConfig.apiKey.substring(0, 8)}...` : null,
+      // 注意：不要在这里返回 apiKey 的任何片段（之前返回前 8 位是密钥泄露）。
+      // 公开的健康检查端点只应暴露“是否已配置”这一布尔值。
+      apiKeyConfigured: !!cliConfig?.apiKey,
       auth: {
         enabled: true,
         serverApiKeyConfigured: !!authConfig.serverApiKey,
