@@ -199,6 +199,12 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
+// favicon：站点没有 favicon 文件，浏览器每次新会话都会请求 /favicon.ico；
+// 直接返回 204（无内容），避免每次都走 404 处理并刷两行日志。
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
 // 提供静态文件（public 目录）- 放在所有特定路由之后
 app.use(express.static(path.join(__dirname, '..', 'public')));
 

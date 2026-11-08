@@ -41,6 +41,13 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+    # 日志轮转：docker 默认 json-file 驱动不限制大小，日志会一直增长；
+    # lh 磁盘已用 84%，限制单个容器日志最多 30MB（10m x 3 个文件）。
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
@@ -62,6 +69,12 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
+    # 日志轮转：与 api 服务同款，单个容器日志最多 30MB。
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
