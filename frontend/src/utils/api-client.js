@@ -47,6 +47,10 @@ export class APIClient {
     return this.request('/api/models');
   }
 
+  async getHealth() {
+    return this.request('/api/health');
+  }
+
   async getClientToken() {
     return this.request('/api/auth/client-token', {
       method: 'POST',
