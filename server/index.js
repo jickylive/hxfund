@@ -57,7 +57,6 @@ const {
   initAuthConfig,
   loadAuthConfig,
   generateTokenHandler,
-  generateToken,
   safeEqual
 } = require('./auth');
 
