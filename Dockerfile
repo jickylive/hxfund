@@ -30,6 +30,12 @@ RUN npm ci --only=production && \
 COPY server/ ./server/
 COPY scripts/qwen-code.js ./scripts/qwen-code.js
 
+# 复制前端入口与静态文件（server/index.js 的根路由与 express.static 要用到）
+# 注意：之前漏拷这两项，导致镜像里没有 /app/index.html 与 /app/public，
+# 线上 GET / 返回 403、静态资源全部 404（2026-11-08 在 lh 容器上实测确认）
+COPY index.html ./
+COPY public/ ./public/
+
 # 设置文件权限
 RUN chown -R nodejs:nodejs /app
 
