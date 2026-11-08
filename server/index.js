@@ -41,7 +41,6 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { 
   requestId, 
   securityHeaders, 
-  logSanitizer,
   userAgentValidator,
   enhancedRateLimit 
 } = require('./middleware/security');
@@ -101,7 +100,6 @@ setupExpressIntegration(app);
 app.use(requestId);
 
 // 日志脱敏
-app.use(logSanitizer);
 
 // 安全头增强
 app.use(securityHeaders);
