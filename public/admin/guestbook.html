@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>留言审核 - 黄氏家族寻根平台</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; max-width: 760px; margin: 0 auto; padding: 24px 16px; color: #333; background: #faf7f2; }
+  h1 { font-size: 1.3rem; }
+  .hint { color: #888; font-size: 0.85rem; }
+  .key-row { display: flex; gap: 8px; margin: 16px 0; }
+  .key-row input { flex: 1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; }
+  button { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+  .btn-primary { background: #8b6914; color: #fff; }
+  .btn-approve { background: #2e7d32; color: #fff; }
+  .btn-delete { background: #c62828; color: #fff; }
+  .btn-ghost { background: #eee; color: #555; }
+  .item { background: #fff; border: 1px solid #e5ddd0; border-radius: 8px; padding: 14px; margin: 12px 0; }
+  .item .meta { color: #888; font-size: 0.8rem; margin-bottom: 6px; }
+  .item .content { white-space: pre-wrap; word-break: break-word; }
+  .item .actions { margin-top: 10px; display: flex; gap: 8px; }
+  .reply-tag { display: inline-block; background: #f0e6d2; color: #8b6914; font-size: 0.75rem; padding: 1px 8px; border-radius: 10px; margin-left: 6px; }
+  .empty { color: #888; text-align: center; padding: 40px 0; }
+  .error { color: #c62828; }
+</style>
+</head>
+<body>
+<h1>留言审核</h1>
+<p class="hint">只有携带服务器 API Key 才能查看和操作。Key 只存在当前浏览器会话里，不会发给第三方。服务器 API Key 在 lh 的 <code>/var/local/docker/hxfund/config/.env</code> 里（<code>SERVER_API_KEY</code>）。</p>
+<div class="key-row">
+  <input id="apiKey" type="password" placeholder="输入服务器 API Key" autocomplete="off">
+  <button class="btn-primary" id="loadBtn">加载待审核</button>
+</div>
+<div id="status"></div>
+<div id="list"></div>
+<script>
+(function () {
+  const apiBase = (window.API_CONFIG && window.API_CONFIG.baseURL) || 'https://api.hxfund.cn';
+  const keyInput = document.getElementById('apiKey');
+  const listEl = document.getElementById('list');
+  const statusEl = document.getElementById('status');
+  keyInput.value = sessionStorage.getItem('adminApiKey') || '';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+  function apiKey() { return keyInput.value.trim(); }
+
+  async function loadPending() {
+    const key = apiKey();
+    if (!key) { statusEl.innerHTML = '<p class="error">请先输入服务器 API Key。</p>'; return; }
+    sessionStorage.setItem('adminApiKey', key);
+    statusEl.textContent = '加载中...';
+    listEl.innerHTML = '';
+    try {
+      const res = await fetch(apiBase + '/api/db/guest-messages/pending', {
+        headers: { 'X-API-Key': key }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+      const rows = data.data || [];
+      statusEl.textContent = '待审核 ' + rows.length + ' 条';
+      if (!rows.length) { listEl.innerHTML = '<div class="empty">没有待审核的留言。</div>'; return; }
+      listEl.innerHTML = rows.map(function (r) {
+        return '<div class="item" data-id="' + r.id + '">' +
+          '<div class="meta">#' + r.id +
+          (r.parent_id ? '<span class="reply-tag">回复 #' + r.parent_id + '</span>' : '') +
+          ' · ' + esc(r.user_name) + ' · ' + esc(r.location || '未知') + ' · ' + esc(r.created_at) + '</div>' +
+          '<div class="content">' + esc(r.content) + '</div>' +
+          '<div class="actions">' +
+          '<button class="btn-approve" data-act="approve" data-id="' + r.id + '">通过</button>' +
+          '<button class="btn-delete" data-act="delete" data-id="' + r.id + '">删除</button>' +
+          '</div></div>';
+      }).join('');
+    } catch (e) {
+      statusEl.innerHTML = '<p class="error">加载失败：' + esc(e.message) + '</p>';
+    }
+  }
+
+  document.getElementById('loadBtn').addEventListener('click', loadPending);
+  keyInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') loadPending(); });
+
+  listEl.addEventListener('click', async function (e) {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const id = btn.dataset.id;
+    const act = btn.dataset.act;
+    const key = apiKey();
+    if (act === 'delete' && !confirm('确定删除这条留言吗？（它的回复也会一并删除）')) return;
+    btn.disabled = true;
+    try {
+      const url = apiBase + '/api/db/guest-messages/' + id + (act === 'approve' ? '/approve' : '');
+      const res = await fetch(url, {
+        method: act === 'approve' ? 'POST' : 'DELETE',
+        headers: { 'X-API-Key': key }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+      await loadPending();
+    } catch (err) {
+      alert('操作失败：' + err.message);
+      btn.disabled = false;
+    }
+  });
+
+  if (keyInput.value) loadPending();
+})();
+</script>
+</body>
+</html>

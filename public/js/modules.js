@@ -350,7 +350,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiBaseUrl = window.API_CONFIG?.baseURL ||
         (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
 
+    // 格式化留言时间
+    function formatGuestTime(createdAt) {
+        const date = new Date(createdAt);
+        if (isNaN(date.getTime())) return createdAt;
+        const days = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+        return days <= 0 ? '今天' : `${days} 天前`;
+    }
+
+    // HTML 转义：留言内容进 innerHTML 前必须转义，防 XSS
+    function escapeGuestHtml(text) {
+        return String(text ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    // 渲染单条留言（含回复按钮；data-id/data-name 供回复定位用）
+    // isReply 为 true 时是楼内回复；repliesHtml 只给顶级留言用，回复嵌在顶级楼内部
+    function renderGuestItem(msg, isReply, repliesHtml) {
+        const cls = isReply ? 'guest-item guest-reply-item' : 'guest-item';
+        const replies = repliesHtml ? `<div class="guest-replies">${repliesHtml}</div>` : '';
+        return `
+            <div class="${cls}" data-id="${msg.id}">
+                <div class="guest-header">
+                    <span class="guest-name">${escapeGuestHtml(msg.user_name)}</span>
+                    <span class="guest-location">📍 ${escapeGuestHtml(msg.location || '未知')}</span>
+                </div>
+                <div class="guest-content">${escapeGuestHtml(msg.content)}</div>
+                <div class="guest-footer">
+                    <span class="guest-time">${formatGuestTime(msg.created_at)}</span>
+                    <button class="guest-reply" data-id="${msg.id}" data-name="${escapeGuestHtml(msg.user_name)}">回复</button>
+                </div>
+                ${replies}
+            </div>
+        `;
+    }
+
     // Function to fetch and render guest messages from API
+    // 后端返回楼中楼：顶级留言带 replies 数组；回复只挂一层，缩进显示
     async function renderGuestList() {
         const guestList = document.getElementById('guestList');
         if (!guestList) return;
@@ -361,13 +401,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Fetch messages from API
             const response = await fetch(`${apiBaseUrl}/api/db/guest-messages?page=1&limit=20`);
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const data = await response.json();
-            
+
             if (!data.success) {
                 throw new Error(data.error || '获取留言失败');
             }
@@ -380,24 +420,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             guestList.innerHTML = messages.map(msg => {
-                // Format the date properly
-                const date = new Date(msg.created_at);
-                const formattedTime = isNaN(date.getTime()) ? msg.created_at : 
-                    `${Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24))} 天前`;
-
-                return `
-                    <div class="guest-item">
-                        <div class="guest-header">
-                            <span class="guest-name">${msg.user_name}</span>
-                            <span class="guest-location">📍 ${msg.location || '未知'}</span>
-                        </div>
-                        <div class="guest-content">${msg.content}</div>
-                        <div class="guest-footer">
-                            <span class="guest-time">${formattedTime}</span>
-                            <button class="guest-reply">回复</button>
-                        </div>
-                    </div>
-                `;
+                const replies = (msg.replies || []).map(r => renderGuestItem(r, true, '')).join('');
+                return renderGuestItem(msg, false, replies);
             }).join('');
         } catch (error) {
             console.error('获取留言失败:', error);
@@ -409,19 +433,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const guestInput = document.getElementById('guestInput');
     const guestNameInput = document.getElementById('guestName');
     const charCount = document.getElementById('charCount');
+    const replyIndicator = document.getElementById('replyIndicator');
+    const replyTargetName = document.getElementById('replyTargetName');
+    const cancelReplyBtn = document.getElementById('cancelReplyBtn');
+
+    // 当前回复目标：{ id: 顶级留言 id, name }；null 表示发顶级留言
+    // 回复的回复也挂到同一顶级留言下，@用户名保留指向
+    let replyTarget = null;
+
+    function setReplyTarget(id, name) {
+        replyTarget = id ? { id, name } : null;
+        if (replyIndicator) {
+            replyIndicator.style.display = replyTarget ? 'flex' : 'none';
+        }
+        if (replyTargetName && replyTarget) {
+            replyTargetName.textContent = `正在回复 @${replyTarget.name}`;
+        }
+        if (postBtn) {
+            postBtn.querySelector('span').textContent = replyTarget ? '发布回复' : '发布留言';
+        }
+    }
+
+    if (cancelReplyBtn) {
+        cancelReplyBtn.addEventListener('click', () => setReplyTarget(null));
+    }
 
     if (postBtn && guestInput) {
         postBtn.addEventListener('click', async () => {
             const content = guestInput.value.trim();
             const name = guestNameInput?.value.trim() || '匿名宗亲';
 
-            if (!content) { 
-                alert('请输入留言内容'); 
-                return; 
+            if (!content) {
+                alert('请输入留言内容');
+                return;
             }
-            if (content.length > 300) { 
-                alert('留言内容不能超过 300 字'); 
-                return; 
+            if (content.length > 300) {
+                alert('留言内容不能超过 300 字');
+                return;
             }
 
             try {
@@ -429,7 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 postBtn.disabled = true;
                 postBtn.textContent = '提交中...';
 
-                // Submit message to API
+                // Submit message to API（回复时带 parent_id）
                 const response = await fetch(`${apiBaseUrl}/api/db/guest-messages`, {
                     method: 'POST',
                     headers: {
@@ -438,7 +486,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({
                         user_name: name,
                         content: content,
-                        location: '未知'  // Default location if not provided
+                        location: '未知',  // Default location if not provided
+                        parent_id: replyTarget ? replyTarget.id : null
                     })
                 });
 
@@ -449,10 +498,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     guestInput.value = '';
                     if (guestNameInput) guestNameInput.value = '';
                     if (charCount) charCount.textContent = '0/300';
-                    
+                    setReplyTarget(null);
+
                     // Refresh the message list
                     await renderGuestList();
-                    
+
                     alert('留言提交成功，等待审核后显示！');
                 } else {
                     throw new Error(result.error || '提交失败');
@@ -463,7 +513,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } finally {
                 // Reset button state
                 postBtn.disabled = false;
-                postBtn.textContent = '提交留言';
+                postBtn.textContent = replyTarget ? '发布回复' : '发布留言';
             }
         });
     }
@@ -474,23 +524,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 留言墙“回复”按钮（2026-11-08 修复：之前只渲染了按钮，没绑点击事件，点它没反应）。
-    // 后端留言没有楼中楼（无 parent_id），所以点击后把 @用户名 带进输入框并聚焦，
-    // 让用户在正文里回复对方；用事件委托绑在列表容器上，列表重新渲染后依然有效。
+    // 留言墙“回复”按钮：用事件委托绑在列表容器上，列表重新渲染后依然有效。
+    // 点击后把回复目标设为该留言所在的顶级楼（回复的回复也挂同一楼），
+    // 输入框上方显示“正在回复 @用户名”，提交时带 parent_id；不再是以前的纯 @ 提及。
     const guestListEl = document.getElementById('guestList');
     if (guestListEl) {
         guestListEl.addEventListener('click', (e) => {
             const replyBtn = e.target.closest('.guest-reply');
             if (!replyBtn) return;
+            // 找到这条留言所在的顶级楼 id：回复挂在顶级楼下
             const item = replyBtn.closest('.guest-item');
-            const name = item?.querySelector('.guest-name')?.textContent?.trim() || '宗亲';
-            const mention = `@${name} `;
+            let topId = replyBtn.dataset.id;
+            const parent = item?.parentElement?.closest('.guest-item');
+            if (item?.classList.contains('guest-reply-item') && parent) {
+                topId = parent.dataset.id;
+            }
+            const name = replyBtn.dataset.name || '宗亲';
+            setReplyTarget(parseInt(topId, 10), name);
             if (guestInput) {
-                if (!guestInput.value.includes(mention)) {
-                    guestInput.value = mention + guestInput.value;
-                }
                 guestInput.focus();
-                if (charCount) charCount.textContent = `${guestInput.value.length}/300`;
+                if (!guestInput.value.includes(`@${name} `)) {
+                    guestInput.value = `@${name} ` + guestInput.value;
+                    if (charCount) charCount.textContent = `${guestInput.value.length}/300`;
+                }
             }
             const guestForm = guestInput?.closest('section') || guestInput;
             guestForm?.scrollIntoView({ behavior: 'smooth', block: 'center' });

@@ -2687,3 +2687,45 @@ textarea#guestInput:focus {
     flex-direction: column;
     gap: 4px;
 }
+
+/* 楼中楼回复：缩进 + 左边框，区别于顶级留言 */
+.guest-replies {
+    margin-top: 10px;
+    padding-left: 14px;
+    border-left: 2px solid var(--border-light);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.guest-reply-item {
+    background: rgba(255, 255, 255, 0.35);
+    padding: 10px 12px;
+}
+
+/* 回复目标提示条：输入框上方显示“正在回复 @xxx”，可取消 */
+.reply-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    margin-bottom: 8px;
+    background: rgba(198, 168, 124, 0.12);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    color: var(--text-mid);
+}
+
+.reply-indicator button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-light);
+    padding: 0 4px;
+}
+
+.reply-indicator button:hover {
+    color: var(--primary);
+}
