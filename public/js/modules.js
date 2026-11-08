@@ -437,6 +437,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const replyTargetName = document.getElementById('replyTargetName');
     const cancelReplyBtn = document.getElementById('cancelReplyBtn');
 
+    // 按钮里的第一个 span 是文字（第二个是 ✉ 图标）。
+    // 改按钮文字只能改这个 span，绝不能对按钮本身用 textContent：那会删掉所有子元素，
+    // 之后再 querySelector('span') 就是 null，报 "can't access property textContent"（本次 bug 的根因）。
+    // span 引用在初始化时一次性取好，之后只改它的 textContent。
+    const postBtnLabel = postBtn ? postBtn.querySelector('span') : null;
+
+    function setPostBtnLabel(text) {
+        if (postBtnLabel) {
+            postBtnLabel.textContent = text;
+        } else if (postBtn) {
+            postBtn.textContent = text; // 兜底：按钮里没有 span 时才直接改文字
+        }
+    }
+
     // 当前回复目标：{ id: 顶级留言 id, name }；null 表示发顶级留言
     // 回复的回复也挂到同一顶级留言下，@用户名保留指向
     let replyTarget = null;
@@ -449,9 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (replyTargetName && replyTarget) {
             replyTargetName.textContent = `正在回复 @${replyTarget.name}`;
         }
-        if (postBtn) {
-            postBtn.querySelector('span').textContent = replyTarget ? '发布回复' : '发布留言';
-        }
+        setPostBtnLabel(replyTarget ? '发布回复' : '发布留言');
     }
 
     if (cancelReplyBtn) {
@@ -475,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 // Show loading state
                 postBtn.disabled = true;
-                postBtn.textContent = '提交中...';
+                setPostBtnLabel('提交中...');
 
                 // Submit message to API（回复时带 parent_id）
                 const response = await fetch(`${apiBaseUrl}/api/db/guest-messages`, {
@@ -513,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } finally {
                 // Reset button state
                 postBtn.disabled = false;
-                postBtn.textContent = replyTarget ? '发布回复' : '发布留言';
+                setPostBtnLabel(replyTarget ? '发布回复' : '发布留言');
             }
         });
     }
