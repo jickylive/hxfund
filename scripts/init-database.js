@@ -63,7 +63,7 @@ async function initializeDatabase() {
     console.log('✅ 连接成功！\n');
 
     // 读取 SQL 文件
-    const sqlFile = path.join(__dirname, 'database', 'init-simple.sql');
+    const sqlFile = path.join(__dirname, 'database', 'legacy', 'init-simple.sql');
     
     if (!fs.existsSync(sqlFile)) {
       console.error(`❌ 错误：SQL 文件不存在：${sqlFile}`);
