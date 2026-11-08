@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function getApiBaseUrl() {
         if (window.API_CONFIG?.baseURL) return window.API_CONFIG.baseURL;
         const host = window.location.hostname;
-        if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:3000';
+        if (host === 'localhost' || host === '127.0.0.1') return window.location.origin;
         return 'https://api.hxfund.cn';
     }
 

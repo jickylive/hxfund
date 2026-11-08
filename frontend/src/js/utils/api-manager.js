@@ -5,7 +5,9 @@
 
 export class APIManager {
     constructor() {
-        this.baseURL = window.API_CONFIG?.baseURL || 'https://api.hxfund.cn';
+        this.baseURL = window.API_CONFIG?.baseURL ||
+            ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                ? window.location.origin : 'https://api.hxfund.cn');
         this.timeout = window.API_CONFIG?.timeout || 30000;
     }
 

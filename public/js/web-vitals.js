@@ -20,7 +20,7 @@ function sendToAnalytics(metricName, value) {
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     // 绝对地址：相对路径会打到 www 主机（万网虚拟主机）404；后端路由为 POST /api/performance/metrics
     const apiBaseUrl = window.API_CONFIG?.baseURL ||
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? window.location.origin : 'https://api.hxfund.cn');
     try { navigator.sendBeacon(`${apiBaseUrl}/api/performance/metrics`, blob); } catch (e) { /* ignore */ }
   }
 }
