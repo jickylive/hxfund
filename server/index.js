@@ -825,12 +825,6 @@ app.get('/api/health', async (req, res) => {
 // ============================================
 setupMonitoringRoutes(app);
 
-// 404 处理
-app.use(notFoundHandler);
-
-// 统一错误处理
-app.use(errorHandler);
-
 /**
  * GET /api/docs
  * API 文档
@@ -1077,6 +1071,12 @@ async function chat(message) {
 </html>
   `);
 });
+
+// 404 处理
+app.use(notFoundHandler);
+
+// 统一错误处理
+app.use(errorHandler);
 
 // ============================================
 // 启动服务器
