@@ -49,6 +49,18 @@ function generateApiKey() {
 }
 
 /**
+ * 恒定时间比较（防 timing 攻击）
+ * 长度不同或非字符串直接返回 false
+ */
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a, 'utf-8');
+  const bufB = Buffer.from(b, 'utf-8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/**
  * 加载认证配置
  */
 function loadAuthConfig() {
@@ -156,7 +168,7 @@ function verifyToken(token, secret) {
       .update(`${headerEncoded}.${payloadEncoded}`)
       .digest('base64url');
 
-    if (signature !== expectedSignature) {
+    if (!safeEqual(signature, expectedSignature)) {
       return { valid: false, error: 'Token 签名无效' };
     }
 
@@ -194,7 +206,7 @@ function verifySignature(method, path, timestamp, body, signature, apiKey) {
   }
 
   const expectedSignature = generateSignature(method, path, timestamp, body, apiKey);
-  if (signature !== expectedSignature) {
+  if (!safeEqual(signature, expectedSignature)) {
     return { valid: false, error: '请求签名无效' };
   }
 
@@ -347,7 +359,7 @@ function authMiddleware(options = {}) {
     }
 
     // 验证服务器 API Key
-    if (apiKeyHeader && apiKeyHeader !== config.serverApiKey) {
+    if (apiKeyHeader && !safeEqual(apiKeyHeader, config.serverApiKey)) {
       return res.status(403).json({
         success: false,
         error: '无效的 API Key',
@@ -423,7 +435,7 @@ function generateTokenHandler(req, res) {
   const { apiKey } = req.body;
 
   // 验证 API Key
-  if (!apiKey || apiKey !== config.serverApiKey) {
+  if (!apiKey || !safeEqual(apiKey, config.serverApiKey)) {
     return res.status(403).json({
       success: false,
       error: '无效的 API Key',
@@ -463,6 +475,9 @@ module.exports = {
   // 签名验证
   generateSignature,
   verifySignature,
+
+  // 安全比较
+  safeEqual,
   
   // 速率限制
   rateLimiter,
