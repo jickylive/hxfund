@@ -740,23 +740,16 @@ app.post('/api/performance/metrics', (req, res) => {
 
 /**
  * POST /api/models/switch
- * 切换默认模型（需要管理员权限）
+ * 切换默认模型：未实现（501）
+ * 此前仅返回"已切换"假成功——默认模型实际由环境变量 GITCODE_MODEL
+ * 固定，运行时无法切换（需改配置后重启服务）。前端无此调用。
  */
 app.post('/api/models/switch', authMiddleware(), (req, res) => {
-  const { model } = req.body;
-  
-  if (!model || !SUPPORTED_MODELS.some(m => m.id === model)) {
-    return res.status(400).json({
-      success: false,
-      error: '不支持的模型'
-    });
-  }
-
-  // 注意：这里只是返回确认，实际默认模型需要在环境变量中配置
-  res.json({
-    success: true,
-    message: `模型已切换为：${model}`,
-    model
+  res.status(501).json({
+    success: false,
+    error: '模型切换未实现：默认模型由环境变量 GITCODE_MODEL 固定，修改配置后重启服务生效',
+    code: 'NOT_IMPLEMENTED',
+    currentModel: process.env.GITCODE_MODEL || process.env.QWEN_MODEL || 'unknown'
   });
 });
 
