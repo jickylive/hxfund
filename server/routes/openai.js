@@ -4,6 +4,8 @@
  */
 
 const express = require('express');
+const { authenticateToken } = require('../middleware/auth');
+const quotaService = require('../services/quotaService');
 const router = express.Router();
 
 // 支持的模型列表（与 aiService.js 保持一致；GitCode 免费模型，后端现走 GitCode API）
@@ -68,8 +70,12 @@ router.get('/models/:model_id', (req, res) => {
 /**
  * POST /v1/chat/completions - 对话补全
  * OpenAI 兼容格式
+ *
+ * 需要认证（X-API-Key 或 Bearer Token），与 /api/chat 一致，
+ * 防止未认证调用消耗 GitCode 免费额度。
+ * /v1/models 保持公开（与 /api/models 一致），供客户端发现模型。
  */
-router.post('/chat/completions', async (req, res) => {
+router.post('/chat/completions', authenticateToken(), async (req, res) => {
   try {
     const { model, messages, temperature = 0.7, max_tokens, stream = false, ...extraParams } = req.body;
 
@@ -99,9 +105,26 @@ router.post('/chat/completions', async (req, res) => {
     // 构建提示词
     const prompt = buildPromptFromMessages(messages);
 
+    // 调用 CLI 前先查免费额度：超限直接返回明确提示
+    const quota = await quotaService.checkQuota();
+    if (!quota.available) {
+      return res.status(429).json({
+        error: {
+          message: quota.reason || '免费额度已用完，请稍后再试',
+          type: 'rate_limit_error',
+          param: null,
+          code: 'quota_exhausted',
+        },
+        quota,
+      });
+    }
+
     // 调用 CLI
     const { callQwenCli } = await import('../cli-wrapper.js');
     const result = await callQwenCli(prompt, { model: chatModel, temperature: validTemp });
+
+    // 记录本次用量（成功调用才计）
+    await quotaService.recordUsage(result.usage?.total_tokens || 0);
 
     if (stream) {
       // 流式响应
