@@ -5,7 +5,7 @@
 
 const express = require('express');
 const dbManager = require('../config/db-manager');
-const { loadAuthConfig } = require('../auth');
+const { loadAuthConfig, safeEqual } = require('../auth');
 
 const router = express.Router();
 
@@ -22,7 +22,7 @@ function requireServerApiKey(req, res, next) {
   if (!config.serverApiKey) {
     return res.status(500).json({ success: false, error: '服务器未配置管理员 API Key' });
   }
-  if (!apiKeyHeader || apiKeyHeader !== config.serverApiKey) {
+  if (!apiKeyHeader || !safeEqual(apiKeyHeader, config.serverApiKey)) {
     return res.status(403).json({ success: false, error: '需要管理员 API Key', code: 'ADMIN_REQUIRED' });
   }
   next();
