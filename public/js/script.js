@@ -57,10 +57,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 从 /api/health 获取后端当前模型（只读展示，不让用户改）
+    // 加 5 秒超时：健康检查接口万一挂起不返回，标签也要及时落到默认模型，
+    // 不能一直停在初始文案上
     async function loadHealthModel() {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         try {
             const apiBaseUrl = getApiBaseUrl();
-            const res = await fetch(`${apiBaseUrl}/api/health`);
+            const res = await fetch(`${apiBaseUrl}/api/health`, { signal: controller.signal });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             if (data.config?.model) {
@@ -68,6 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) {
             console.warn('从 /api/health 获取模型失败，使用默认模型:', error.message);
+        } finally {
+            clearTimeout(timeoutId);
         }
         if (qwenModelLabel) {
             qwenModelLabel.textContent = modelDisplayName(currentModel);
