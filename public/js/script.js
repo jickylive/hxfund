@@ -1,6 +1,12 @@
 /**
  * 黄氏家族寻根平台 - Qwen AI 客户端脚本
- * 增强版 v3.1.0 - 支持认证、多轮对话
+ * 简化版 v4.0.0 - 模型由后端 /api/health 下发，前端不展示参数配置
+ *
+ * 变更说明（2026-11-08）：
+ * - 模型参数从 /api/health 获取（config.model），不再调 /api/models、不再展示模型下拉框
+ * - 参数配置面板已从页面移除：温度固定 0.7（后端默认值），不再让用户改模型/温度
+ * - 发送按钮加固：全部流程包在 try/finally 里，任何一步抛错都会恢复按钮可用状态，
+ *   避免 isSending 卡死导致按钮永久无响应
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,15 +15,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const qwenInput = document.getElementById('qwenInput');
     const qwenSendBtn = document.getElementById('qwenSendBtn');
     const qwenTokens = document.getElementById('qwenTokens');
-    const qwenModelSelect = document.getElementById('qwenModelSelect');
-    const qwenTemperature = document.getElementById('qwenTemperature');
-    const tempValue = document.getElementById('tempValue');
+    const qwenModelLabel = document.getElementById('qwenModelLabel');
 
     let sessionId = null;
     let totalTokens = 0;
     let authToken = null;
     let tokenExpiresAt = null;
     let isSending = false;
+    // 当前模型：由后端 /api/health 下发；未取到时用后端默认值兜底
+    let currentModel = 'deepseek-ai/DeepSeek-V4-Flash';
+    const DEFAULT_TEMPERATURE = 0.7;
 
     // 关键元素缺失时整个客户端无法工作，直接退出避免后续空指针
     if (!qwenMessages || !qwenInput || !qwenSendBtn) {
@@ -43,6 +50,30 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/'/g, '&#39;');
     }
 
+    // 模型 ID 转展示名：取斜杠后的最后一段，去掉横杠换成空格
+    function modelDisplayName(modelId) {
+        const short = String(modelId || '').split('/').pop();
+        return short.replace(/-/g, ' ');
+    }
+
+    // 从 /api/health 获取后端当前模型（只读展示，不让用户改）
+    async function loadHealthModel() {
+        try {
+            const apiBaseUrl = getApiBaseUrl();
+            const res = await fetch(`${apiBaseUrl}/api/health`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if (data.config?.model) {
+                currentModel = data.config.model;
+            }
+        } catch (error) {
+            console.warn('从 /api/health 获取模型失败，使用默认模型:', error.message);
+        }
+        if (qwenModelLabel) {
+            qwenModelLabel.textContent = modelDisplayName(currentModel);
+        }
+    }
+
     // 安全解析本地配置：localStorage 损坏时回退 {} 并清除坏键，不让初始化中断
     function safeParseConfig(raw) {
         if (!raw) return {};
@@ -56,15 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 加载配置
-    function loadConfig() {
-        const config = safeParseConfig(localStorage.getItem('qwenConfig'));
-        if (config.model && qwenModelSelect) qwenModelSelect.value = config.model;
-        if (config.temperature) {
-            if (qwenTemperature) qwenTemperature.value = config.temperature;
-            if (tempValue) tempValue.textContent = config.temperature;
-        }
-
+    // 加载已保存的 Token（只存 Token，不再存模型/温度）
+    function loadSavedToken() {
         // 优先从 sessionStorage 加载 Token（更安全）
         const sessionToken = sessionStorage.getItem('authToken');
         const sessionExpires = sessionStorage.getItem('tokenExpiresAt');
@@ -75,38 +99,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 authToken = sessionToken;
                 tokenExpiresAt = expiresAt;
                 console.log('✓ 已加载 session 中的认证 Token');
-                loadModels();
                 return;
             }
         }
 
         // sessionStorage 无有效 Token，尝试从 localStorage 加载
+        const config = safeParseConfig(localStorage.getItem('qwenConfig'));
         if (config.token && config.tokenExpiresAt && config.tokenExpiresAt > Date.now()) {
             authToken = config.token;
             tokenExpiresAt = config.tokenExpiresAt;
             console.log('✓ 已加载 localStorage 中的认证 Token');
         }
-
-        loadModels();
     }
 
-    // 保存配置
-    function saveConfig() {
+    // 保存 Token（只存 Token）
+    function saveToken() {
         const config = {
-            model: qwenModelSelect ? qwenModelSelect.value : 'deepseek-ai/DeepSeek-V4-Flash',
-            temperature: qwenTemperature ? qwenTemperature.value : '0.7',
             token: authToken,
             tokenExpiresAt: tokenExpiresAt
         };
-        localStorage.setItem('qwenConfig', JSON.stringify(config));
-        alert('配置已保存！');
-    }
-
-    // 温度值更新
-    if (qwenTemperature) {
-        qwenTemperature.addEventListener('input', () => {
-            if (tempValue) tempValue.textContent = qwenTemperature.value;
-        });
+        try { localStorage.setItem('qwenConfig', JSON.stringify(config)); } catch (e) { console.warn('保存 Token 失败:', e.message); }
     }
 
     // 获取认证 Token
@@ -140,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // 如果响应不是JSON，使用状态文本
                     errorData = { error: response.statusText, status: response.status };
                 }
-                
+
                 throw new Error(`获取 Token 失败：${errorData.error || response.status}`);
             }
 
@@ -153,11 +165,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 sessionStorage.setItem('authToken', authToken);
                 sessionStorage.setItem('tokenExpiresAt', tokenExpiresAt.toString());
 
-                // 同时保存到 localStorage（用于持久化配置）
-                const savedConfig = safeParseConfig(localStorage.getItem('qwenConfig'));
-                savedConfig.token = authToken;
-                savedConfig.tokenExpiresAt = tokenExpiresAt;
-                localStorage.setItem('qwenConfig', JSON.stringify(savedConfig));
+                // 同时保存到 localStorage（用于持久化）
+                saveToken();
 
                 console.log('✓ 已获取新的认证 Token');
                 return authToken;
@@ -171,58 +180,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }
     }
-
-    // 加载模型列表
-    async function loadModels() {
-        try {
-            const apiBaseUrl = getApiBaseUrl();
-
-            const res = await fetch(`${apiBaseUrl}/api/models`);
-
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-            }
-
-            const data = await res.json();
-            if (data.success) {
-                if (!Array.isArray(data.models) || data.models.length === 0) {
-                    throw new Error('模型列表数据格式异常：models 不是有效数组');
-                }
-                const currentModel = qwenModelSelect ? qwenModelSelect.value : '';
-                if (qwenModelSelect) {
-                    qwenModelSelect.innerHTML = data.models.map(m =>
-                        `<option value="${escapeHtml(m.id)}" ${m.default ? 'selected' : ''}>${escapeHtml(m.name)} (${escapeHtml(m.id)})${m.default ? ' - 默认' : ''}</option>`
-                    ).join('');
-                    if (currentModel && data.models.some(m => m.id === currentModel)) {
-                        qwenModelSelect.value = currentModel;
-                    }
-                }
-
-                // 获取认证 Token
-                await getAuthToken();
-            } else {
-                console.warn('加载模型列表失败:', data.error || '未知错误');
-                addMessage('ai', `⚠️ 模型列表加载失败：${data.error || '无法连接到服务'}`);
-            }
-        } catch (error) {
-            console.error('加载模型列表失败:', error.message);
-
-            // 区分真正的网络异常与数据格式问题，避免误导用户去查网络
-            // 注意：addMessage 会先转义再把 \n 转 <br>，这里用 \n 换行，
-            // 直接写 <br> 会被转义成字面文字显示出来。
-            const isNetworkError = error instanceof TypeError && error.message === 'Failed to fetch';
-            if (error.message.includes('404')) {
-                addMessage('ai', `⚠️ 网络错误：API 端点不存在\n无法加载模型列表，请检查网络连接或联系管理员。`);
-            } else if (error.message.includes('Unexpected token <')) {
-                addMessage('ai', `⚠️ 网络错误：收到非JSON响应\n无法加载模型列表，请检查网络连接。`);
-            } else if (isNetworkError) {
-                addMessage('ai', `⚠️ 网络错误：Failed to fetch\n无法加载模型列表，请检查网络连接。`);
-            } else {
-                addMessage('ai', `⚠️ 模型列表加载失败：${error.message}\n请稍后重试或联系管理员。`);
-            }
-        }
-    }
-
 
     // 添加消息（内容先转义再插 innerHTML，防 XSS；换行转 <br> 保留排版）
     function addMessage(role, content) {
@@ -315,6 +272,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 发送消息
+    // 加固：从置 isSending 到恢复按钮的全部流程都在 try/finally 里，
+    // 中间任何一步抛错（DOM 操作、网络请求）都会恢复按钮可用状态，
+    // 不会留下“按钮永久禁用、再次点击无响应”的死锁。
     async function sendMessage() {
         // 防重复提交：请求在途时忽略再次点击
         if (isSending) return;
@@ -327,35 +287,34 @@ document.addEventListener('DOMContentLoaded', () => {
         isSending = true;
         qwenSendBtn.disabled = true;
 
-        // 添加用户消息
-        addMessage('user', message);
-
-        const currentMessage = message;
-
-        // 清空输入
-        qwenInput.value = '';
-
-        // 显示加载状态
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'qwen-message ai-message';
-        loadingDiv.innerHTML = `
-            <div class="qwen-avatar ai-avatar">🤖</div>
-            <div class="qwen-content">
-                <div class="qwen-name">Qwen AI</div>
-                <div class="qwen-text"><i>正在思考中...</i></div>
-            </div>
-        `;
-        qwenMessages.appendChild(loadingDiv);
-        qwenMessages.scrollTop = qwenMessages.scrollHeight;
-
+        let loadingDiv = null;
         try {
-            const model = qwenModelSelect ? qwenModelSelect.value : 'deepseek-ai/DeepSeek-V4-Flash';
-            const temperature = qwenTemperature ? qwenTemperature.value : '0.7';
+            // 添加用户消息
+            addMessage('user', message);
 
-            const data = await callConversationAPI(currentMessage, model, temperature);
+            const currentMessage = message;
+
+            // 清空输入
+            qwenInput.value = '';
+
+            // 显示加载状态
+            loadingDiv = document.createElement('div');
+            loadingDiv.className = 'qwen-message ai-message';
+            loadingDiv.innerHTML = `
+                <div class="qwen-avatar ai-avatar">🤖</div>
+                <div class="qwen-content">
+                    <div class="qwen-name">Qwen AI</div>
+                    <div class="qwen-text"><i>正在思考中...</i></div>
+                </div>
+            `;
+            qwenMessages.appendChild(loadingDiv);
+            qwenMessages.scrollTop = qwenMessages.scrollHeight;
+
+            const data = await callConversationAPI(currentMessage, currentModel, DEFAULT_TEMPERATURE);
 
             // 移除加载状态（remove() 已删除过也不会抛错）
             loadingDiv.remove();
+            loadingDiv = null;
 
             if (data.success) {
                 // 更新会话 ID
@@ -372,9 +331,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } catch (error) {
-            loadingDiv.remove();
+            if (loadingDiv) loadingDiv.remove();
             addMessage('ai', `抱歉，出现错误：${error.message}`);
-            
+
             // 如果是认证相关的错误，提示用户可能需要重新加载页面
             if (error.message.includes('认证令牌') || error.message.includes('Token')) {
                 addMessage('ai', `💡 提示：如果问题持续，请尝试刷新页面重新连接。`);
@@ -402,18 +361,18 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshTokenBtn.style.marginLeft = '10px';
     refreshTokenBtn.style.padding = '8px 12px';
     refreshTokenBtn.style.fontSize = '0.9rem';
-    
+
     const qwenInputFooter = document.querySelector('.qwen-input-footer');
     if (qwenInputFooter) {
         qwenInputFooter.appendChild(refreshTokenBtn);
-        
+
         refreshTokenBtn.addEventListener('click', async () => {
             // 清除现有令牌
             authToken = null;
             tokenExpiresAt = null;
             sessionStorage.removeItem('authToken');
             sessionStorage.removeItem('tokenExpiresAt');
-            
+
             // 尝试获取新令牌
             const newToken = await getAuthToken();
             if (newToken) {
@@ -424,14 +383,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 初始化
-    loadConfig();
+    // 初始化：加载已保存的 Token，并从 /api/health 获取当前模型
+    loadSavedToken();
+    loadHealthModel();
 
-    // 保存配置按钮
-    const qwenSaveConfig = document.getElementById('qwenSaveConfig');
-    if (qwenSaveConfig) {
-        qwenSaveConfig.addEventListener('click', saveConfig);
-    }
-
-    console.log('✅ Qwen AI 客户端已加载 (增强版)');
+    console.log('✅ Qwen AI 客户端已加载 (简化版 v4.0.0)');
 });

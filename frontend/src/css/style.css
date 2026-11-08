@@ -1460,6 +1460,13 @@ body::before {
     font-family: 'Arial', sans-serif;
 }
 
+/* 模型只读标签（v4.0.0：模型由 /api/health 下发，只展示不让改） */
+.qwen-model {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    font-family: 'Arial', sans-serif;
+}
+
 .qwen-config-panel {
     height: fit-content;
     align-self: flex-start;
