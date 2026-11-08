@@ -2,7 +2,9 @@
  * 黄氏家族寻根平台 - 认证中间件
  */
 
-const { loadAuthConfig, verifyToken } = require('./auth');
+// 注意：必须引用上级目录的 server/auth.js；写成 ./auth 会解析到本文件自身，
+// 解构得到 undefined，导致所有使用 authenticateToken 的路由 500
+const { loadAuthConfig, verifyToken } = require('../auth');
 
 function authenticateToken(options = {}) {
   return (req, res, next) => {
