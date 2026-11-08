@@ -9,6 +9,9 @@ const { loadAuthConfig } = require('../auth');
 
 const router = express.Router();
 
+// 导出给单元测试用
+router.buildGuestTree = buildGuestTree;
+
 /**
  * 管理员鉴权：只有携带服务器 API Key（X-API-Key 请求头）才能操作。
  * 普通访客拿到的 JWT 客户端 Token 不能通过这里，留言审核/删除必须是你本人。
