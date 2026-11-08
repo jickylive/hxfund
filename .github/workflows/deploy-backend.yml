@@ -1,0 +1,229 @@
+# 后端自动部署 - 阿里云 ECS（lh 主机，Docker Compose）
+#
+# 为什么是新文件而不是恢复旧的 .disabled：
+#   旧的 5 个后端 workflow（deploy-backend、deploy-backend-ecs、deploy-docker、
+#   deploy-all、deploy-full-stack）全部基于 pm2 或阿里云 ACR 镜像，
+#   目标路径是 /var/www/huangshi-genealogy 或 /var/www/hxfund-api，
+#   与当前实际情况（lh 主机 /var/local/docker/hxfund/、docker compose、服务名 api）
+#   完全不符，强行启用会把错误代码部署到错误路径，故全部保持 .disabled，
+#   由本文件取而代之。详见 PR #30 之后的部署修复说明。
+#
+# 部署方式（与此前人工部署一致）：
+#   打包 server/ + package.json + package-lock.json + Dockerfile → scp 到 lh /tmp →
+#   备份旧目录为 /var/local/docker/hxfund.bak.YYYYMMDD-HHMMSS →
+#   解压覆盖（不删 config/）→ docker compose up -d --build ${{ env.SERVICE_NAME }} → 健康检查。
+#   注意：docker-compose.yml 是主机侧文件，不随代码下发（lh 的 compose 挂载
+#   ./config/.env 与 ./config/auth.json，与仓库版不同）；config/ 目录绝不能覆盖。
+#
+# 回滚：健康检查失败时自动执行 rollback 作业，用部署前备份恢复并重建容器。
+#
+# 需要的 GitHub Secrets（与 deploy/GITHUB_SECRETS_SETUP.md 的 ECS 部分同名）：
+#   ECS_HOST    lh 主机地址（lh.hxfund.cn）
+#   ECS_USER    SSH 用户名（jicky）
+#   ECS_SSH_KEY SSH 私钥（对应公钥须已授权到 lh 的 ~/.ssh/authorized_keys）
+
+name: 后端部署 - 阿里云 ECS（lh）
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile'
+  workflow_dispatch:  # 允许手动触发
+
+# 部署中途绝不取消：两个部署并发会互相覆盖，排队等前一个完成
+concurrency:
+  group: deploy-backend-lh
+  cancel-in-progress: false
+
+env:
+  DEPLOY_DIR: /var/local/docker/hxfund
+  SERVICE_NAME: api
+  HEALTH_URL: https://api.hxfund.cn/api/health
+
+jobs:
+  deploy:
+    name: 部署后端到 lh
+    runs-on: ubuntu-latest
+    outputs:
+      backup_dir: ${{ steps.deploy-remote.outputs.backup_dir }}
+
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+
+      - name: 📦 打包后端文件
+        run: |
+          # 只打包重建 api 镜像需要的文件；config/（.env、auth.json）是主机侧机密，
+          # 绝不进包，万一本地残留也用 --exclude 挡掉
+          tar -czf backend.tar.gz \
+            --exclude='server/config/.env' \
+            --exclude='server/config/auth.json' \
+            server/ \
+            package.json \
+            package-lock.json \
+            Dockerfile
+
+      - name: 🔐 设置 SSH 密钥
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ECS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.ECS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 📤 上传部署包到 lh
+        run: |
+          scp -i ~/.ssh/id_rsa backend.tar.gz \
+            ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }}:/tmp/backend-${{ github.sha }}.tar.gz
+
+      - name: 🚀 部署到 lh
+        id: deploy-remote
+        run: |
+          # 注意：备份目录名必须传回 runner（供回滚作业用），但 $GITHUB_OUTPUT
+          # 只在 runner 上存在、lh 上没有，所以让远端把 "BACKUP_DIR=..." 打印到
+          # stdout，runner 再从输出里取。set +e 是故意的：ssh 失败时也要先把
+          # 备份目录写进 outputs（回滚就靠它），再用原退出码让本步失败。
+          set +e
+          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} << 'ENDSSH' | tee deploy-output.txt
+            set -e
+            DEPLOY_DIR=/var/local/docker/hxfund
+            BACKUP_DIR="/var/local/docker/hxfund.bak.$(date +%Y%m%d-%H%M%S)"
+
+            # 前置检查：部署目录与 compose 文件必须在，否则是主机侧出了问题，停下来别动
+            if [ ! -d "$DEPLOY_DIR" ]; then
+              echo "❌ 部署目录不存在：$DEPLOY_DIR（请先在 lh 上按人工流程建好）"
+              exit 1
+            fi
+            if [ ! -f "$DEPLOY_DIR/docker-compose.yml" ] && [ ! -f "$DEPLOY_DIR/docker-compose.yaml" ]; then
+              echo "❌ $DEPLOY_DIR 下没有 docker-compose.yml（主机侧文件，不随代码下发）"
+              exit 1
+            fi
+            # config/ 是主机侧机密，部署前必须存在，部署后必须还在
+            if [ ! -f "$DEPLOY_DIR/config/.env" ] || [ ! -f "$DEPLOY_DIR/config/auth.json" ]; then
+              echo "❌ $DEPLOY_DIR/config/.env 或 config/auth.json 缺失，拒绝部署"
+              exit 1
+            fi
+
+            # 1. 备份旧目录（整个目录复制，含 config/，回滚就靠它）
+            cp -a "$DEPLOY_DIR" "$BACKUP_DIR"
+            echo "备份已创建：$BACKUP_DIR"
+            echo "BACKUP_DIR=$BACKUP_DIR"
+
+            # 2. 解压覆盖（tar 直接覆盖同名文件，config/ 不在包里所以不会被动）
+            tar -xzf /tmp/backend-${{ github.sha }}.tar.gz -C "$DEPLOY_DIR"
+            rm -f /tmp/backend-${{ github.sha }}.tar.gz
+
+            # 3. 确认机密文件没被动过
+            if [ ! -f "$DEPLOY_DIR/config/.env" ] || [ ! -f "$DEPLOY_DIR/config/auth.json" ]; then
+              echo "❌ 解压后 config/.env 或 config/auth.json 丢失，停止部署（回滚作业会恢复备份）"
+              exit 1
+            fi
+
+            # 4. 重建并启动 api 服务（redis 不动）
+            cd "$DEPLOY_DIR"
+            docker compose up -d --build ${{ env.SERVICE_NAME }}
+
+            # 5. 等容器起来，看一眼状态和日志
+            sleep 10
+            docker compose ps ${{ env.SERVICE_NAME }}
+            docker compose logs ${{ env.SERVICE_NAME }} --tail 20
+          ENDSSH
+          SSH_EXIT=${PIPESTATUS[0]}
+          # 远端打印的是 BACKUP_DIR=...，这里转成小写的 backup_dir 输出
+          #（job outputs 里引用的是 backup_dir，大小写必须一致）
+          grep '^BACKUP_DIR=' deploy-output.txt | sed 's/^BACKUP_DIR=/backup_dir=/' >> "$GITHUB_OUTPUT" || echo "backup_dir=" >> "$GITHUB_OUTPUT"
+          exit $SSH_EXIT
+
+      - name: 🧪 健康检查
+        run: |
+          # 注意：/api/health 目前恒返回 200（DB/Redis 挂了也报 ok，见代码评审），
+          # 这里只能证明 HTTP 服务起来了；真正的 DB 健康检查见 /api/db/health。
+          echo "等待服务就绪，最多重试 10 次..."
+          for i in $(seq 1 10); do
+            if curl -fs -A "Mozilla/5.0" --connect-timeout 10 --max-time 30 "${{ env.HEALTH_URL }}" > /dev/null; then
+              echo "✅ 健康检查通过（第 $i 次）"
+              exit 0
+            fi
+            echo "第 $i 次未通过，10 秒后重试..."
+            sleep 10
+          done
+          echo "❌ 健康检查失败，触发回滚作业"
+          exit 1
+
+      - name: 🧹 清理旧备份（保留最近 3 个）
+        if: success()
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} << 'ENDSSH'
+            cd /var/local/docker
+            # 按时间倒序，删掉第 4 个及更老的备份目录
+            ls -dt hxfund.bak.* 2>/dev/null | tail -n +4 | xargs -r rm -rf
+            echo "剩余备份："
+            ls -dt hxfund.bak.* 2>/dev/null || echo "（无）"
+          ENDSSH
+
+      - name: ✅ 部署完成
+        if: success()
+        run: |
+          echo "✅ 后端已部署到 lh：${{ env.DEPLOY_DIR }}"
+          echo "API：https://api.hxfund.cn"
+          echo "提交：${{ github.sha }}"
+
+  # ============================================
+  # 回滚：只有部署作业失败时才跑
+  # ============================================
+  rollback:
+    name: 回滚到部署前备份
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: failure()
+
+    steps:
+      - name: 🔐 设置 SSH 密钥
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ECS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.ECS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: ⏪ 恢复备份并重建容器
+        run: |
+          ssh -i ~/.ssh/id_rsa ${{ secrets.ECS_USER }}@${{ secrets.ECS_HOST }} << 'ENDSSH'
+            set -e
+            DEPLOY_DIR=/var/local/docker/hxfund
+            BACKUP_DIR="${{ needs.deploy.outputs.backup_dir }}"
+
+            # 没有备份（部署在备份前就失败了）就没东西可回滚，直接报错让人看日志
+            if [ -z "$BACKUP_DIR" ] || [ ! -d "$BACKUP_DIR" ]; then
+              echo "❌ 没有可用备份（部署在备份步骤之前就失败了），无法自动回滚，请人工检查"
+              exit 1
+            fi
+
+            echo "正在用备份恢复：$BACKUP_DIR"
+            # 坏的当前目录先挪走（留着排查，不直接删），再把备份拷回来
+            FAILED_DIR="${DEPLOY_DIR}.failed.$(date +%Y%m%d-%H%M%S)"
+            mv "$DEPLOY_DIR" "$FAILED_DIR"
+            cp -a "$BACKUP_DIR" "$DEPLOY_DIR"
+            echo "坏版本已移走：$FAILED_DIR"
+
+            cd "$DEPLOY_DIR"
+            docker compose up -d --build ${{ env.SERVICE_NAME }}
+            sleep 10
+            docker compose ps ${{ env.SERVICE_NAME }}
+            docker compose logs ${{ env.SERVICE_NAME }} --tail 20
+          ENDSSH
+
+      - name: 🧪 回滚后健康检查
+        run: |
+          for i in $(seq 1 10); do
+            if curl -fs -A "Mozilla/5.0" --connect-timeout 10 --max-time 30 "${{ env.HEALTH_URL }}" > /dev/null; then
+              echo "✅ 回滚后服务恢复（第 $i 次）"
+              exit 0
+            fi
+            echo "第 $i 次未通过，10 秒后重试..."
+            sleep 10
+          done
+          echo "❌ 回滚后健康检查仍失败，请立即人工介入"
+          exit 1
