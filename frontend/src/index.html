@@ -25,11 +25,10 @@
          API 配置（部署时修改为实际地址）
     ============================================= -->
     <script>
-        // 生产环境：https://api.hxfund.cn
-        // 开发环境：http://localhost:3000
+        // 环境感知：本地调试（localhost/127.0.0.1）走同源本地后端，生产走 api 子域
         window.API_CONFIG = {
-            baseURL: window.location.hostname === 'localhost'
-                ? 'http://localhost:3000'
+            baseURL: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                ? window.location.origin
                 : 'https://api.hxfund.cn',
             timeout: 30000
         };
