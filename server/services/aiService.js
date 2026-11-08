@@ -7,20 +7,17 @@ const { callQwenCli, isCliConfigured, getCliConfig } = require('../cli-wrapper')
 const logger = require('../config/logger');
 
 /**
- * 支持的模型列表
+ * 支持的模型列表（GitCode 免费模型，后端现走 GitCode API）
  */
 const SUPPORTED_MODELS = [
-  { id: 'qwen3.5-plus', name: 'Qwen3.5 Plus', description: '多模态，默认模型', default: true },
-  { id: 'qwen3-max-2026-01-23', name: 'Qwen3 Max', description: '最强推理能力' },
-  { id: 'qwen3-coder-next', name: 'Qwen3 Coder Next', description: '代码专用' },
-  { id: 'qwen3-coder-plus', name: 'Qwen3 Coder Plus', description: '代码增强' },
-  { id: 'glm-5', name: 'GLM-5', description: '支持思考模式' },
-  { id: 'glm-4.7', name: 'GLM-4.7', description: '支持思考模式' },
-  { id: 'kimi-k2.5', name: 'Kimi K2.5', description: '支持思考模式' },
-  { id: 'deepseek-ai/DeepSeek-V4-Flash', name: 'DeepSeek-V4-Flash (GitCode)', description: 'GitCode 免费，默认模型' },
-  { id: 'zai-org/GLM-5.1', name: 'GLM-5.1 (GitCode)', description: 'GitCode 免费' },
-  { id: 'Qwen/Qwen3-30B-A3B', name: 'Qwen3-30B-A3B (GitCode)', description: 'GitCode 免费' },
-  { id: 'Qwen3-235B-A22B', name: 'Qwen3-235B-A22B (SCNET)', description: 'SCNET OpenAI兼容模型' },
+  { id: 'deepseek-ai/DeepSeek-V4-Flash', name: 'DeepSeek V4 Flash', description: 'GitCode 免费，默认模型', default: true },
+  { id: 'Qwen/Qwen3-32B', name: 'Qwen3 32B', description: 'GitCode 免费' },
+  { id: 'Qwen/Qwen3-30B-A3B', name: 'Qwen3 30B A3B', description: 'GitCode 免费' },
+  { id: 'Qwen/Qwen3-30B-A3B-Instruct-2507', name: 'Qwen3 30B A3B Instruct', description: 'GitCode 免费' },
+  { id: 'Qwen/Qwen3-30B-A3B-Thinking-2507', name: 'Qwen3 30B A3B Thinking', description: '思考模式，GitCode 免费' },
+  { id: 'Qwen/Qwen3-4B-Instruct-2507', name: 'Qwen3 4B Instruct', description: '轻量快速，GitCode 免费' },
+  { id: 'Qwen/Qwen2.5-VL-72B', name: 'Qwen2.5 VL 72B', description: '多模态，GitCode 免费' },
+  { id: 'zai-org/GLM-5.1', name: 'GLM-5.1', description: 'GitCode 免费' },
 ];
 
 /**
@@ -28,7 +25,7 @@ const SUPPORTED_MODELS = [
  */
 class AIService {
   constructor() {
-    this.defaultModel = 'qwen3.5-plus';
+    this.defaultModel = 'deepseek-ai/DeepSeek-V4-Flash';
     this.defaultTemperature = 0.7;
     this.maxPromptLength = 5000;
   }

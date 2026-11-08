@@ -113,9 +113,9 @@ const swaggerOptions = {
             },
             model: {
               type: 'string',
-              description: '模型ID',
-              default: 'qwen3.5-plus',
-              enum: ['qwen3.5-plus', 'qwen3-max-2026-01-23', 'qwen3-coder-next', 'qwen3-coder-plus', 'glm-5', 'glm-4.7', 'kimi-k2.5']
+              description: '模型ID（GitCode 免费模型）',
+              default: 'deepseek-ai/DeepSeek-V4-Flash',
+              enum: ['deepseek-ai/DeepSeek-V4-Flash', 'Qwen/Qwen3-32B', 'Qwen/Qwen3-30B-A3B', 'Qwen/Qwen3-30B-A3B-Instruct-2507', 'Qwen/Qwen3-30B-A3B-Thinking-2507', 'Qwen/Qwen3-4B-Instruct-2507', 'Qwen/Qwen2.5-VL-72B', 'zai-org/GLM-5.1']
             },
             temperature: {
               type: 'number',
