@@ -14,9 +14,31 @@ const express = require('express');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const dbManager = require('./config/db-manager');
+const { loadAuthConfig, safeEqual } = require('./auth');
 
 // Waline API 版本
 const WALINE_VERSION = '1.0.0';
+
+// 评论状态白名单（PUT 改状态时只接受这三个值）
+const ALLOWED_COMMENT_STATUS = ['approved', 'waiting', 'spam'];
+
+/**
+ * 管理员鉴权：只有携带服务器 API Key（X-API-Key 请求头）才能删改评论。
+ * 与 server/routes/database.js 的 requireServerApiKey 同款逻辑（留言墙审核用），
+ * 这里单独定义一份，避免跨路由引用。
+ * 普通访客拿到的 JWT 客户端 Token 不能通过这里。
+ */
+function requireServerApiKey(req, res, next) {
+  const config = loadAuthConfig();
+  const apiKeyHeader = req.headers['x-api-key'];
+  if (!config.serverApiKey) {
+    return res.status(500).json({ errno: 500, errmsg: '服务器未配置管理员 API Key' });
+  }
+  if (!apiKeyHeader || !safeEqual(apiKeyHeader, config.serverApiKey)) {
+    return res.status(403).json({ errno: 403, errmsg: '需要管理员 API Key' });
+  }
+  next();
+}
 
 // 常量定义
 const DEFAULT_PAGE_SIZE = 10;
@@ -605,9 +627,9 @@ router.post('/comment', async (req, res) => {
 
 /**
  * DELETE /api/waline/comment/:id
- * 删除评论
+ * 删除评论（需管理员 API Key）
  */
-router.delete('/comment/:id', async (req, res) => {
+router.delete('/comment/:id', requireServerApiKey, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -670,12 +692,20 @@ router.delete('/comment/:id', async (req, res) => {
 
 /**
  * PUT /api/waline/comment/:id
- * 更新评论
+ * 更新评论（需管理员 API Key）
  */
-router.put('/comment/:id', async (req, res) => {
+router.put('/comment/:id', requireServerApiKey, async (req, res) => {
   try {
     const { id } = req.params;
     const { content, status, isSpam } = req.body;
+
+    // status 只接受白名单值，防任意改审核状态
+    if (status !== undefined && !ALLOWED_COMMENT_STATUS.includes(status)) {
+      return res.status(400).json({
+        errno: 400,
+        errmsg: 'status 非法，只接受 approved / waiting / spam'
+      });
+    }
 
     // MySQL 存储
     if (await dbOk()) {
@@ -939,10 +969,11 @@ router.get('/health', (req, res) => {
  * 格式化评论对象
  */
 function formatComment(comment) {
+  // 注意：公开接口不返回 mail / ip / ua（隐私泄露）。
+  // 头像用 mailMd5（邮箱小写 MD5）生成，管理员如需看邮箱请走带鉴权的管理端点。
   return {
     id: comment.id,
     nick: comment.nick,
-    mail: comment.mail,
     link: comment.link,
     comment: comment.content,
     avatar: `https://cravatar.cn/avatar/${comment.mailMd5}?s=64&d=mp`,
@@ -957,8 +988,6 @@ function formatComment(comment) {
     comments: comment.comments || 0,
     pid: comment.pid,
     rid: comment.rid,
-    ua: comment.ua,
-    ip: comment.ip,
     url: comment.url
   };
 }

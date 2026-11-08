@@ -5,11 +5,17 @@
 const https = require('https');
 
 // GitCode API 配置
+// 注意：API Key 绝不能硬编码进仓库（2026-11-08 前的版本曾把真实 Key 写在这里，
+// 已泄露，必须去 GitCode 控制台轮换）。现在从环境变量读取，无 Key 直接报错退出。
 const GITCODE_CONFIG = {
-  apiKey: '7vgfybV4gKVKNLdZzaLfv-ty',
-  baseURL: 'https://api-ai.gitcode.com/v1',
-  model: 'Qwen/Qwen3.5-397B-A17B'  // 使用原始模型名称
+  apiKey: process.env.GITCODE_API_KEY,
+  baseURL: process.env.GITCODE_BASE_URL || 'https://api-ai.gitcode.com/v1',
+  model: process.env.GITCODE_MODEL || 'deepseek-ai/DeepSeek-V4-Flash'
 };
+
+if (!GITCODE_CONFIG.apiKey) {
+  throw new Error('缺少 GITCODE_API_KEY 环境变量（请在 GitCode 控制台轮换后填入）');
+}
 
 async function testGitCodeAPI() {
   console.log('🧪 开始测试 GitCode OpenAI 兼容模型集成...\n');
