@@ -86,6 +86,15 @@ class QwenAI {
       if (data.config?.model) {
         this.currentModel = data.config.model;
       }
+      // 额度已用完：提示用户并禁用发送，等额度恢复再试
+      if (data.config?.modelAvailable === false) {
+        const reason = data.config?.quota?.reason || '免费额度已用完，请稍后再试';
+        this.addMessage('ai', `⚠️ ${reason}`);
+        if (this.qwenSendBtn) {
+          this.qwenSendBtn.disabled = true;
+          this.qwenSendBtn.title = reason;
+        }
+      }
     } catch (error) {
       console.warn('从 /api/health 获取模型失败，使用默认模型:', error.message);
     } finally {

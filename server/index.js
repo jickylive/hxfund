@@ -64,6 +64,9 @@ const {
 // 引入 Redis 会话存储
 const sessionStore = require('./session-store');
 
+// 引入 AI 免费额度跟踪（提供默认模型前先查额度）
+const quotaService = require('./services/quotaService');
+
 // 引入 Waline 评论系统
 const walineRouter = require('./waline');
 
@@ -454,8 +457,22 @@ app.post('/api/chat', authMiddleware(), async (req, res) => {
       });
     }
 
+    // 调用 CLI 前先查免费额度：超限直接返回明确提示
+    const quota = await quotaService.checkQuota();
+    if (!quota.available) {
+      return res.status(429).json({
+        success: false,
+        error: quota.reason || '免费额度已用完，请稍后再试',
+        code: 'QUOTA_EXHAUSTED',
+        quota
+      });
+    }
+
     // 调用 CLI 获取 AI 响应
     const result = await callQwenCli(trimmedPrompt, { model, temperature });
+
+    // 记录本次用量（成功调用才计）
+    await quotaService.recordUsage(result.usage?.total_tokens || 0);
     const responseTime = Date.now() - startTime;
 
     res.json({
@@ -574,8 +591,22 @@ app.post('/api/conversation', authMiddleware(), async (req, res) => {
 
     const fullPrompt = conversationContext + trimmedMessage;
 
+    // 调用 CLI 前先查免费额度：超限直接返回明确提示，不把请求发出去等上游报错
+    const quota = await quotaService.checkQuota();
+    if (!quota.available) {
+      return res.status(429).json({
+        success: false,
+        error: quota.reason || '免费额度已用完，请稍后再试',
+        code: 'QUOTA_EXHAUSTED',
+        quota
+      });
+    }
+
     // 调用 CLI 获取 AI 响应
     const result = await callQwenCli(fullPrompt, { model, temperature });
+
+    // 记录本次用量（成功调用才计）
+    await quotaService.recordUsage(result.usage?.total_tokens || 0);
 
     // 添加消息到历史
     session.messages.push({ role: 'user', content: trimmedMessage });
@@ -749,6 +780,9 @@ app.get('/api/health', async (req, res) => {
     sessionsCount = -1;
   }
 
+  // 提供默认模型前先查免费额度：超限则 modelAvailable=false，前端据此提示用户稍后再试
+  const modelStatus = await quotaService.getDefaultModelStatus(cliConfig?.model);
+
   res.json({
     status: 'ok',
     service: 'huangshi-genealogy-api',
@@ -757,7 +791,9 @@ app.get('/api/health', async (req, res) => {
     config: {
       cliConfigured,
       cliPath: CLI_PATH,
-      model: cliConfig?.model || 'deepseek-ai/DeepSeek-V4-Flash',
+      model: modelStatus.model,
+      modelAvailable: modelStatus.available,
+      quota: modelStatus.quota,
       baseURL: cliConfig?.baseURL || null,
       // 注意：不要在这里返回 apiKey 的任何片段（之前返回前 8 位是密钥泄露）。
       // 公开的健康检查端点只应暴露“是否已配置”这一布尔值。
