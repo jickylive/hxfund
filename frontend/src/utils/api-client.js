@@ -47,8 +47,8 @@ export class APIClient {
     return this.request('/api/models');
   }
 
-  async getHealth() {
-    return this.request('/api/health');
+  async getHealth(signal) {
+    return this.request('/api/health', signal ? { signal } : {});
   }
 
   async getClientToken() {

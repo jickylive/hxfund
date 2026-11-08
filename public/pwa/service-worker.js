@@ -10,7 +10,11 @@
  */
 
 // 版本号（每次更新时递增）
-const CACHE_VERSION = 'v3';
+// v4（2026-11-08）：修 .min.js 被当成“版本化资源”走 cacheFirst 导致旧 JS 永久不更新的问题。
+// 之前 isVersionedAsset 把 .min. 当成内容哈希，script.min.js 等文件名固定、内容随部署变的文件
+// 被 cacheFirst 永久缓存；PR #14 部署后，已访问过的浏览器仍跑旧 JS，模型标签一直停在“加载中...”。
+// 升版后激活时删掉 static-v3/dynamic-v3，强制重新拉取。
+const CACHE_VERSION = 'v4';
 const STATIC_CACHE = `static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `dynamic-${CACHE_VERSION}`;
 
@@ -123,15 +127,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 版本化静态资源：缓存优先，长期缓存
+  // 真正带内容哈希的资源：缓存优先，长期缓存
+  // 注意：只有文件名里带 8 位十六进制哈希的才算版本化资源。
+  // .min.js/.min.css 只是压缩标记，文件名固定、内容随每次部署变化，
+  // 绝不能走 cacheFirst，否则新部署的 JS/CSS 永远不会被已访问过的浏览器拉取。
   if (isVersionedAsset(url.pathname)) {
     event.respondWith(cacheFirst(request, STATIC_CACHE));
     return;
   }
 
-  // 普通静态资源：缓存优先
+  // 普通静态资源（.min.js、.css 等无哈希文件名）：网络优先，离线时用缓存
+  // 保证每次部署后浏览器都能拿到最新版本，而不是永久 serving 旧缓存
   if (isStaticAsset(url.pathname)) {
-    event.respondWith(cacheFirst(request, STATIC_CACHE));
+    event.respondWith(networkFirst(request));
     return;
   }
 
@@ -140,10 +148,10 @@ self.addEventListener('fetch', (event) => {
 });
 
 /**
- * 判断是否为版本化资源（带哈希的文件名）
+ * 判断是否为版本化资源（文件名里带 8 位十六进制内容哈希）
  */
 function isVersionedAsset(pathname) {
-  return /[.-][0-9a-f]{8}\./.test(pathname) || pathname.includes('.min.');
+  return /[.-][0-9a-f]{8}\./.test(pathname);
 }
 
 /**
