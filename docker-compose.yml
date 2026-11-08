@@ -1,57 +1,38 @@
-version: '3.8'
+# hxfund 后端容器化部署（与 lh 生产环境的 compose 保持一致）
+# 只含 api + redis；前端已走 FTP 到万网虚拟主机，不再用容器里的 frontend。
+# TLS 由 ESA（api.hxfund.cn 直指 lh）与 nginx-proxy 终结，不再需要 api-proxy 服务。
+#
+# 与 lh 上 /var/local/docker/hxfund/docker-compose.yml 的区别仅两处：
+#   - build context：这里是 .（仓库根目录），lh 上是 ../../hxfund
+#   - 配置挂载：这里是 ./server/config/.env 与 ./server/config/auth.json，
+#     lh 上是 ./config/.env 与 ./config/auth.json（lh 的配置目录是单独的）
+# 其余内容（镜像、环境变量、网络、健康检查、内存限制）与 lh 完全一致。
+# 改动这里后，记得同步更新 lh 上的那份（或反过来）。
 
 services:
-  # Redis 缓存（内部服务）
-  redis:
-    image: docker.m.daocloud.io/redis:7-alpine
-    container_name: huangshi-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
-    volumes:
-      - redis-data:/data
-    networks:
-      - internal
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-        reservations:
-          memory: 64M
-
-  # 后端 API 服务（内部服务）
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: huangshi-api
+    image: registry.cn-shenzhen.aliyuncs.com/jicky/hxfund-api:latest
+    container_name: hxfund-api
     restart: unless-stopped
-    # 不暴露端口到主机，仅在内部网络中可用
     expose:
       - "3000"
-    env_file:
-      - .env
     environment:
-      # 确保环境变量传递给容器
-      - NODE_ENV=${NODE_ENV:-production}
+      - NODE_ENV=production
       - PORT=3000
-      - REDIS_URL=redis://redis:6379
-      - QWEN_API_KEY=${QWEN_API_KEY:-}
-      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
-      - QWEN_MODEL=${QWEN_MODEL:-qwen3.5-plus}
-      - QWEN_BASE_URL=${QWEN_BASE_URL:-https://coding.dashscope.aliyuncs.com/v1}
-      - QWEN_TEMPERATURE=${QWEN_TEMPERATURE:-0.7}
+      - ALLOWED_ORIGINS=https://hxfund.cn,https://www.hxfund.cn,https://api.hxfund.cn
+      - REDIS_URL=redis://hxfund-redis:6379
+      - VIRTUAL_HOST=api.hxfund.cn
+      - LETSENCRYPT_HOST=api.hxfund.cn
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-mail@hxfund.cn}
     volumes:
-      # 挂载日志目录
       - ./logs:/app/logs
-      # 挂载配置目录（敏感信息）
-      - ./server/config:/app/server/config:ro
+      - ./server/config/.env:/app/server/config/.env:ro
+      - ./server/config/auth.json:/app/server/config/auth.json:ro
     networks:
-      - internal
+      - webproxy
     depends_on:
       - redis
     healthcheck:
@@ -64,51 +45,32 @@ services:
       resources:
         limits:
           memory: 256M
-        reservations:
-          memory: 128M
 
-  # API 反向代理 (HTTPS) - 唯一对外暴露的服务
-  api-proxy:
-    image: docker.m.daocloud.io/nginx:1.25-alpine
-    container_name: huangshi-api-proxy
+  redis:
+    image: registry.cn-shenzhen.aliyuncs.com/jicky/redis:latest
+    container_name: hxfund-redis
     restart: unless-stopped
-    # 仅暴露80和443端口供外部访问
-    ports:
-      - "80:80"
-      - "443:443"
+    command: redis-server --appendonly yes
+    expose:
+      - "6379"
     volumes:
-      - ./deploy/api-nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./server/config/cert.pem:/etc/nginx/ssl/ssl_certificate.crt:ro
-      - ./server/config/private.pem:/etc/nginx/ssl/ssl_private.key:ro
+      - redis-data:/data
     networks:
-      - internal
-    depends_on:
-      - api
+      - webproxy
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80/nginx_status"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
       retries: 3
-      start_period: 40s
     deploy:
       resources:
         limits:
-          memory: 32M
-        reservations:
-          memory: 16M
+          memory: 128M
 
-# 定义网络
 networks:
-  # 内部网络，用于服务间通信
-  internal:
-    driver: bridge
-    # 启用内部网络加密（可选）
-    enable_ipv6: false
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.20.0.0/16
+  webproxy:
+    external: true
+    name: webproxy
 
 volumes:
   redis-data:
-    driver: local
