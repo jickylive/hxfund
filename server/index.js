@@ -210,18 +210,17 @@ app.use('/v1', openaiRouter);
 // 配置与常量
 // ============================================
 
-// 支持的模型列表 (Coding Plan)
+// 支持的模型列表 (GitCode 免费模型，后端现走 GitCode API)
+// 注意：百炼模型（qwen3.5-plus 等）不在 GitCode 上，调它们会返回“参数错误”，故不再列出
 const SUPPORTED_MODELS = [
-  { id: 'qwen3.5-plus', name: 'Qwen3.5 Plus', description: '多模态，默认模型', default: true },
-  { id: 'qwen3-max-2026-01-23', name: 'Qwen3 Max', description: '最强推理能力' },
-  { id: 'qwen3-coder-next', name: 'Qwen3 Coder Next', description: '代码专用' },
-  { id: 'qwen3-coder-plus', name: 'Qwen3 Coder Plus', description: '代码增强' },
-  { id: 'glm-5', name: 'GLM-5', description: '支持思考模式' },
-  { id: 'glm-4.7', name: 'GLM-4.7', description: '支持思考模式' },
-  { id: 'kimi-k2.5', name: 'Kimi K2.5', description: '支持思考模式' },
-  { id: 'deepseek-ai/DeepSeek-V4-Flash', name: 'DeepSeek-V4-Flash (GitCode)', description: 'GitCode 免费，默认模型' },
-  { id: 'zai-org/GLM-5.1', name: 'GLM-5.1 (GitCode)', description: 'GitCode 免费' },
-  { id: 'Qwen/Qwen3-30B-A3B', name: 'Qwen3-30B-A3B (GitCode)', description: 'GitCode 免费' },
+  { id: 'deepseek-ai/DeepSeek-V4-Flash', name: 'DeepSeek V4 Flash', description: 'GitCode 免费，默认模型', default: true },
+  { id: 'Qwen/Qwen3-32B', name: 'Qwen3 32B', description: 'GitCode 免费' },
+  { id: 'Qwen/Qwen3-30B-A3B', name: 'Qwen3 30B A3B', description: 'GitCode 免费' },
+  { id: 'Qwen/Qwen3-30B-A3B-Instruct-2507', name: 'Qwen3 30B A3B Instruct', description: 'GitCode 免费' },
+  { id: 'Qwen/Qwen3-30B-A3B-Thinking-2507', name: 'Qwen3 30B A3B Thinking', description: '思考模式，GitCode 免费' },
+  { id: 'Qwen/Qwen3-4B-Instruct-2507', name: 'Qwen3 4B Instruct', description: '轻量快速，GitCode 免费' },
+  { id: 'Qwen/Qwen2.5-VL-72B', name: 'Qwen2.5 VL 72B', description: '多模态，GitCode 免费' },
+  { id: 'zai-org/GLM-5.1', name: 'GLM-5.1', description: 'GitCode 免费' },
 ];
 
 // 会话存储（使用 Redis，支持多实例部署）
@@ -404,7 +403,7 @@ app.post('/api/chat', authMiddleware(), async (req, res) => {
   const startTime = Date.now();
 
   try {
-    const { prompt, model = 'qwen3.5-plus', temperature = 0.7 } = req.body;
+    const { prompt, model = 'deepseek-ai/DeepSeek-V4-Flash', temperature = 0.7 } = req.body;
 
     // 输入验证 - prompt
     if (!prompt || typeof prompt !== 'string') {
@@ -486,7 +485,7 @@ app.post('/api/conversation', authMiddleware(), async (req, res) => {
   const startTime = Date.now();
 
   try {
-    const { message, model = 'qwen3.5-plus', temperature = 0.7, sessionId: reqSessionId } = req.body;
+    const { message, model = 'deepseek-ai/DeepSeek-V4-Flash', temperature = 0.7, sessionId: reqSessionId } = req.body;
 
     // 输入验证 - message
     if (!message || typeof message !== 'string') {
@@ -677,7 +676,7 @@ app.get('/api/models', (req, res) => {
   res.json({
     success: true,
     models: SUPPORTED_MODELS,
-    default: SUPPORTED_MODELS.find(m => m.default)?.id || 'qwen3.5-plus'
+    default: SUPPORTED_MODELS.find(m => m.default)?.id || 'deepseek-ai/DeepSeek-V4-Flash'
   });
 });
 
@@ -758,7 +757,7 @@ app.get('/api/health', async (req, res) => {
     config: {
       cliConfigured,
       cliPath: CLI_PATH,
-      model: cliConfig?.model || 'qwen3.5-plus',
+      model: cliConfig?.model || 'deepseek-ai/DeepSeek-V4-Flash',
       baseURL: cliConfig?.baseURL || null,
       apiKeyPrefix: cliConfig?.apiKey ? `${cliConfig.apiKey.substring(0, 8)}...` : null,
       auth: {
@@ -905,7 +904,7 @@ curl -X POST http://localhost:${PORT}/api/chat \\
   <table>
     <tr><th>参数</th><th>类型</th><th>必填</th><th>说明</th></tr>
     <tr><td><span class="param-name">prompt</span></td><td><span class="param-type">string</span></td><td>是</td><td>用户问题</td></tr>
-    <tr><td><span class="param-name">model</span></td><td><span class="param-type">string</span></td><td>否</td><td>模型 ID，默认 qwen3.5-plus</td></tr>
+    <tr><td><span class="param-name">model</span></td><td><span class="param-type">string</span></td><td>否</td><td>模型 ID，默认 deepseek-ai/DeepSeek-V4-Flash</td></tr>
     <tr><td><span class="param-name">temperature</span></td><td><span class="param-type">number</span></td><td>否</td><td>温度 (0-2)，默认 0.7</td></tr>
   </table>
 
@@ -1118,7 +1117,7 @@ async function startServer() {
 ╠═══════════════════════════════════════════════════════════╣
 ║  CLI 路径：${CLI_PATH}                              ║
 ║  CLI 配置：${cliConfigured ? '✓ 已配置' : '✗ 未配置'}${!cliConfigured ? ' 运行 node qwen-code.js --init' : ''}
-║  默认模型：${cliConfig?.model || 'qwen3.5-plus'}                            ║
+║  默认模型：${cliConfig?.model || 'deepseek-ai/DeepSeek-V4-Flash'}                            ║
 ╠═══════════════════════════════════════════════════════════╣
 ║  统一使用 qwen-code.js CLI 工具调用 AI                      ║
 ╚═══════════════════════════════════════════════════════════╝

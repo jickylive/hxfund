@@ -7,7 +7,7 @@ export class ConfigManager {
   constructor() {
     this.configKey = 'qwen-user-config';
     this.defaultConfig = {
-      model: 'qwen3.5-plus',
+      model: 'deepseek-ai/DeepSeek-V4-Flash',
       temperature: 0.7,
       maxTokens: 2048,
       historyLength: 10,

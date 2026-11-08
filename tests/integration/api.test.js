@@ -40,7 +40,7 @@ describe('API 集成测试', () => {
         .set('User-Agent', 'Mozilla/5.0');
 
       expect(response.body).toHaveProperty('default');
-      expect(response.body.default).toBe('qwen3.5-plus');
+      expect(response.body.default).toBe('deepseek-ai/DeepSeek-V4-Flash');
     });
   });
 
