@@ -1,5 +1,12 @@
 /**
- * 黄氏家族寻根平台 - 速率限制中间件
+ * 黄氏家族寻根平台 - 速率限制中间件（express-rate-limit 封装）
+ *
+ * 注意：当前主链路未挂载本模块的限流器——general/chat/login 三个 limiter
+ * 仅被 routes/api.js 引用，而该路由文件未被 index.js 挂载（孤儿代码）。
+ * 主链路实际生效的限流：
+ *   1. middleware/security.js enhancedRateLimit（全局，IP 固定窗口）
+ *   2. auth.js RateLimiter（authMiddleware 内，认证端点按端点细分）
+ * 新增路由如需限流，请从这两个中选择，避免第三套机制。
  */
 
 const rateLimit = require('express-rate-limit');
