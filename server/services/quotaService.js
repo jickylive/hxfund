@@ -132,6 +132,150 @@ async function recordUsage(tokens = 0) {
   }
 }
 
+// ==================== 原子预占（防并发超发） ====================
+//
+// 问题：旧流程是 checkQuota() 先读、recordUsage() 后记（check-then-act），
+// 并发请求能同时读到“还剩 1 次”全部放行，免费额度可任意超发。
+// 修复：用一条 Redis Lua 脚本在一次执行里完成“读剩余 → 判断 → 预占扣减”
+// （Redis 单线程执行脚本，天然原子），调用方先预占、成功才调 CLI。
+//
+// 预占只扣“调用次数”（1 次）；Token 用量调用前未知，成功后由 recordTokens()
+// 按实际用量补记。estimatedTokens 参数用于将来需要提前预留 Token 的场景。
+
+/**
+ * 原子预占一条 Lua 脚本。
+ * KEYS[1] 5 小时调用计数 key，KEYS[2] 当月 Token 计数 key。
+ * ARGV[1] 调用次数上限，ARGV[2] 月 Token 上限，ARGV[3] 预留 Token 数，
+ * ARGV[4] 调用计数 key TTL（秒），ARGV[5] Token 计数 key TTL（秒）。
+ * 返回 {是否允许 1/0, 扣减后调用次数, 扣减后 Token 数, 拒绝原因 0=无 1=次数超限 2=Token 超限}。
+ */
+const RESERVE_LUA = `
+local calls = tonumber(redis.call('GET', KEYS[1]) or '0')
+local tokens = tonumber(redis.call('GET', KEYS[2]) or '0')
+local est = tonumber(ARGV[3])
+if calls + 1 > tonumber(ARGV[1]) then
+  return {0, calls, tokens, 1}
+end
+if tokens + est > tonumber(ARGV[2]) then
+  return {0, calls, tokens, 2}
+end
+redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) == -1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[4])
+end
+if est > 0 then
+  redis.call('INCRBY', KEYS[2], est)
+  if redis.call('TTL', KEYS[2]) == -1 then
+    redis.call('EXPIRE', KEYS[2], ARGV[5])
+  end
+end
+return {1, calls + 1, tokens + est, 0}
+`;
+
+/**
+ * 原子检查并预占 1 次调用额度（推荐调用路径，替代 checkQuota + recordUsage 的两步流程）。
+ * @param {number} [estimatedTokens=0] - 提前预留的 Token 数（通常 0，成功后由 recordTokens 按实际补记）
+ * @returns {Promise<{available: boolean, reserved: boolean, remainingCalls: number|null, remainingTokens: number|null, callsLimit: number, tokensLimit: number, reason: string|null, windowResetAt: string, windowKey: string}>}
+ *   reserved=true 表示已实际扣减（CLI 失败时需调 refundReservation 退还）；
+ *   Redis 不可用时 fail-open：available=true 但 reserved=false，不阻塞对话。
+ */
+async function checkAndReserve(estimatedTokens = 0) {
+  const callsLimit = currentCallsLimit();
+  const windowKey = `ai:calls:5h:${currentWindowStart()}`;
+  const result = {
+    available: true,
+    reserved: false,
+    remainingCalls: null,
+    remainingTokens: null,
+    callsLimit,
+    tokensLimit: TOKENS_PER_MONTH,
+    reason: null,
+    windowResetAt: new Date(currentWindowStart() + WINDOW_MS).toISOString(),
+    windowKey
+  };
+
+  const client = sessionStore.getRedisClient();
+  if (!client) {
+    // Redis 不可用：放行，只记日志（不阻塞对话）
+    logger.warn('额度预占跳过：Redis 未连接（fail-open）');
+    return result;
+  }
+
+  try {
+    const month = new Date().toISOString().slice(0, 7);
+    const monthKey = `ai:tokens:month:${month}`;
+    const est = Math.max(0, Math.floor(estimatedTokens) || 0);
+    const [allowed, usedCalls, usedTokens, reasonCode] = await client.eval(RESERVE_LUA, {
+      keys: [windowKey, monthKey],
+      arguments: [
+        String(callsLimit),
+        String(TOKENS_PER_MONTH),
+        String(est),
+        String(5 * 60 * 60),
+        String(32 * 24 * 60 * 60)
+      ]
+    });
+
+    result.remainingCalls = Math.max(0, callsLimit - usedCalls);
+    result.remainingTokens = Math.max(0, TOKENS_PER_MONTH - usedTokens);
+
+    if (allowed !== 1) {
+      result.available = false;
+      result.reason = reasonCode === 1
+        ? `5 小时调用额度已用完（${usedCalls}/${callsLimit} 次），${new Date(result.windowResetAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} 后恢复`
+        : `本月 Token 额度已用完（${usedTokens}/${TOKENS_PER_MONTH}），下月 1 日恢复`;
+      return result;
+    }
+
+    result.reserved = true;
+    return result;
+  } catch (error) {
+    // Redis 出错：放行，只记日志
+    logger.warn('额度预占失败（fail-open）:', error.message);
+    return result;
+  }
+}
+
+/**
+ * 按实际用量补记 Token（checkAndReserve 成功调用 CLI 后调用）。
+ * 调用次数已在预占时扣过，这里只加 Token，不再重复计次数。
+ */
+async function recordTokens(tokens = 0) {
+  if (!tokens || tokens <= 0) return;
+  const client = sessionStore.getRedisClient();
+  if (!client) return;
+  try {
+    const month = new Date().toISOString().slice(0, 7);
+    const monthKey = `ai:tokens:month:${month}`;
+    await client.incrBy(monthKey, Math.max(0, Math.floor(tokens)));
+    await client.expire(monthKey, 32 * 24 * 60 * 60);
+  } catch (error) {
+    logger.warn('额度 Token 记录失败（忽略）:', error.message);
+  }
+}
+
+/**
+ * 退还一次预占的调用额度（CLI 调用失败时调用，免得失败请求也占额度）。
+ * @param {string} [windowKey] - 预占时返回的 windowKey（缺省为当前窗口）；
+ *   用传入的 key 而不用当前窗口，是为了跨 5 小时窗口边界的长调用不扣错窗口。
+ * 计数器不低于 0（Lua 内判下限），Redis 不可用时静默跳过。
+ */
+async function refundReservation(windowKey) {
+  const client = sessionStore.getRedisClient();
+  if (!client) return;
+  try {
+    const key = windowKey || `ai:calls:5h:${currentWindowStart()}`;
+    await client.eval(
+      `local c = tonumber(redis.call('GET', KEYS[1]) or '0')
+       if c > 0 then redis.call('DECR', KEYS[1]) end
+       return 1`,
+      { keys: [key] }
+    );
+  } catch (error) {
+    logger.warn('额度预占退还失败（忽略）:', error.message);
+  }
+}
+
 /**
  * 提供默认模型前的统一入口：返回默认模型 + 额度状态。
  * 前端从 /api/health 拿到的就是这份数据。
@@ -152,6 +296,9 @@ module.exports = {
   TOKENS_PER_MONTH,
   checkQuota,
   recordUsage,
+  checkAndReserve,
+  recordTokens,
+  refundReservation,
   getDefaultModelStatus,
   isNightHours,
   currentCallsLimit,

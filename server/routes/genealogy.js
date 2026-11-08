@@ -1,6 +1,13 @@
 /**
  * 黄氏家族寻根平台 - 族谱 API 路由
- * 支持 MySQL（生产）和 Mock 数据（本地开发）
+ * 只读真实 MySQL 数据（2026-11-08 起不再有 mock 回退）。
+ *
+ * 历史原因：本文件曾在 DB 不可用或 SQL 报错时返回写死的 MOCK_* 假数据，
+ * 导致生产页面长期展示假族谱/假字辈/假留言，且三条 SQL 引用了生产库不存在的列
+ * （generation_poems.dynasty、project_slides.order、guest_messages.is_approved），
+ * 恒抛错后被 catch 吞掉、永远走 mock——健康检查还报 200，问题完全不可见。
+ * 现按 database/schema/001-010（生产库结构备份）的真实列名修正 SQL，
+ * 出错一律返回 500，不再返回假数据。
  */
 
 const express = require('express');
@@ -8,91 +15,45 @@ const router = express.Router();
 const dbManager = require('../config/db-manager');
 const { authenticateToken } = require('../middleware/auth');
 
-// ==================== Mock 数据 ====================
-
-const MOCK_MEMBERS = [
-  { id: 1, name: '黄庆交', generation: '庆字辈', parent_id: null, level: 1, sort_order: 1, birth_year: 1930, status: '已确认' },
-  { id: 2, name: '黄志强', generation: '志字辈', parent_id: 1, level: 2, sort_order: 1, birth_year: 1955, status: '已确认' },
-  { id: 3, name: '黄志明', generation: '志字辈', parent_id: 1, level: 2, sort_order: 2, birth_year: 1958, status: '已确认' },
-  { id: 4, name: '黄伟', generation: '伟字辈', parent_id: 2, level: 3, sort_order: 1, birth_year: 1980, status: '已确认' },
-  { id: 5, name: '黄芳', generation: '伟字辈', parent_id: 2, level: 3, sort_order: 2, birth_year: 1983, status: '已确认' },
-];
-
-const MOCK_POEMS = [
-  { id: 1, generation_range: '1-20', poem: '庆志伟业传家远，诗书礼乐继世长', dynasty: '清代', region: '福建漳州' },
-  { id: 2, generation_range: '21-40', poem: '明德惟馨光祖德，修身齐家治国平', dynasty: '民国', region: '福建漳州' },
-];
-
-const MOCK_SLIDES = [
-  { id: 1, title: '黄氏家族起源', content: '黄姓源于嬴姓，始祖为黄飞虎', order: 1, image_url: '/images/slide1.jpg' },
-  { id: 2, title: '家族迁徙历史', content: '从河南固始南迁至福建漳州', order: 2, image_url: '/images/slide2.jpg' },
-];
-
-const MOCK_MESSAGES = [
-  { id: 1, name: '黄先生', email: 'huang@example.com', content: '希望早日找到失散的亲人！', avatar: '😊', is_approved: 1, created_at: '2024-01-15 10:30:00' },
-  { id: 2, name: '黄女士', email: 'huang2@example.com', content: '感谢平台提供寻根服务', avatar: '🌸', is_approved: 1, created_at: '2024-01-14 09:15:00' },
-];
-
-const MOCK_BLOCKCHAIN = [
-  { id: 1, data_hash: '0x1a2b3c...', record_type: 'family_tree', record_id: 1, tx_hash: '0xabc...', created_at: '2024-01-10 12:00:00' },
-];
-
-// 检查数据库是否可用
-async function checkDbAvailable() {
-  try {
-    await dbManager.query('SELECT 1');
-    return true;
-  } catch (e) {
-    return false;
-  }
+// DB 出错时统一返回 500（不把 MySQL 原始报错 / 列名泄露给未鉴权访客），
+// 详情只写服务端日志。
+function dbError(res, error, context) {
+  console.error(`[genealogy] ${context} error:`, error.message);
+  return res.status(500).json({ success: false, error: '数据库查询失败', code: 'DB_ERROR' });
 }
 
 // ==================== 族谱成员 ====================
 
 // 获取完整族谱树
+// family_members 真实列：id / parent_id / name / title / period / level / sort_order / ...
 router.get('/members/tree', async (req, res) => {
   try {
-    const dbOk = await checkDbAvailable();
-    if (dbOk) {
-      const members = await dbManager.query('SELECT * FROM family_members ORDER BY level, sort_order');
-      return res.json({ success: true, data: members, count: members.length, source: 'database' });
-    }
-    res.json({ success: true, data: MOCK_MEMBERS, count: MOCK_MEMBERS.length, source: 'mock' });
+    const members = await dbManager.query('SELECT * FROM family_members ORDER BY level, sort_order');
+    return res.json({ success: true, data: members, count: members.length, source: 'database' });
   } catch (error) {
-    res.json({ success: true, data: MOCK_MEMBERS, count: MOCK_MEMBERS.length, source: 'mock', warning: '数据库异常，使用模拟数据' });
+    return dbError(res, error, 'GET /members/tree');
   }
 });
 
 // 获取单个成员详情
 router.get('/members/:id', async (req, res) => {
   try {
-    const dbOk = await checkDbAvailable();
-    if (dbOk) {
-      const rows = await dbManager.query('SELECT * FROM family_members WHERE id = ?', [req.params.id]);
-      const member = rows[0] || null;
-      if (!member) return res.status(404).json({ success: false, error: '成员不存在', code: 'MEMBER_NOT_FOUND' });
-      return res.json({ success: true, data: member });
-    }
-    const member = MOCK_MEMBERS.find(m => m.id === parseInt(req.params.id)) || null;
-    if (!member) return res.status(404).json({ success: false, error: '成员不存在（模拟数据中无此ID）', code: 'MEMBER_NOT_FOUND' });
-    res.json({ success: true, data: member, source: 'mock' });
+    const rows = await dbManager.query('SELECT * FROM family_members WHERE id = ?', [req.params.id]);
+    const member = rows[0] || null;
+    if (!member) return res.status(404).json({ success: false, error: '成员不存在', code: 'MEMBER_NOT_FOUND' });
+    return res.json({ success: true, data: member });
   } catch (error) {
-    res.json({ success: true, data: MOCK_MEMBERS[0], source: 'mock', warning: '数据库异常' });
+    return dbError(res, error, 'GET /members/:id');
   }
 });
 
 // 获取子成员列表
 router.get('/members/:parentId/children', async (req, res) => {
   try {
-    const dbOk = await checkDbAvailable();
-    if (dbOk) {
-      const children = await dbManager.query('SELECT * FROM family_members WHERE parent_id = ? ORDER BY sort_order', [req.params.parentId]);
-      return res.json({ success: true, data: children, parentId: req.params.parentId, count: children.length });
-    }
-    const children = MOCK_MEMBERS.filter(m => m.parent_id === parseInt(req.params.parentId));
-    res.json({ success: true, data: children, parentId: req.params.parentId, count: children.length, source: 'mock' });
+    const children = await dbManager.query('SELECT * FROM family_members WHERE parent_id = ? ORDER BY sort_order', [req.params.parentId]);
+    return res.json({ success: true, data: children, parentId: req.params.parentId, count: children.length });
   } catch (error) {
-    res.json({ success: true, data: [], parentId: req.params.parentId, count: 0, source: 'mock' });
+    return dbError(res, error, 'GET /members/:parentId/children');
   }
 });
 
@@ -117,16 +78,14 @@ router.delete('/members/:id', authenticateToken(), (req, res) => {
 // ==================== 字辈诗 ====================
 
 // 获取字辈诗
+// 修正：generation_poems 表无 dynasty 列（真实列：branch_code / branch_name / poem / characters），
+// 原 ORDER BY dynasty 恒抛错、恒走 mock；现按 branch_code 排序。
 router.get('/poems', async (req, res) => {
   try {
-    const dbOk = await checkDbAvailable();
-    if (dbOk) {
-      const poems = await dbManager.query('SELECT * FROM generation_poems ORDER BY dynasty');
-      return res.json({ success: true, data: poems, count: poems.length });
-    }
-    res.json({ success: true, data: MOCK_POEMS, count: MOCK_POEMS.length, source: 'mock' });
+    const poems = await dbManager.query('SELECT * FROM generation_poems ORDER BY branch_code');
+    return res.json({ success: true, data: poems, count: poems.length });
   } catch (error) {
-    res.json({ success: true, data: MOCK_POEMS, count: MOCK_POEMS.length, source: 'mock' });
+    return dbError(res, error, 'GET /poems');
   }
 });
 
@@ -138,16 +97,14 @@ router.post('/poems', authenticateToken(), (req, res) => {
 // ==================== 项目幻灯片 ====================
 
 // 获取幻灯片
+// 修正：project_slides 表无 order 列，真实排序列是 sort_order（另有 is_active 开关，
+// 只返回已启用的）；原 ORDER BY `order` 恒抛错、恒走 mock。
 router.get('/slides', async (req, res) => {
   try {
-    const dbOk = await checkDbAvailable();
-    if (dbOk) {
-      const slides = await dbManager.query('SELECT * FROM project_slides ORDER BY `order`');
-      return res.json({ success: true, data: slides, count: slides.length });
-    }
-    res.json({ success: true, data: MOCK_SLIDES, count: MOCK_SLIDES.length, source: 'mock' });
+    const slides = await dbManager.query('SELECT * FROM project_slides WHERE is_active = 1 ORDER BY sort_order');
+    return res.json({ success: true, data: slides, count: slides.length });
   } catch (error) {
-    res.json({ success: true, data: MOCK_SLIDES, count: MOCK_SLIDES.length, source: 'mock' });
+    return dbError(res, error, 'GET /slides');
   }
 });
 
@@ -159,16 +116,15 @@ router.post('/slides', authenticateToken(), (req, res) => {
 // ==================== 留言板 ====================
 
 // 获取留言
+// 修正：guest_messages 表无 is_approved 列，真实状态列是 is_public（公开显示）
+// 与 is_verified（已审核）；与 server/routes/database.js 的公开留言口径一致，
+// 只返回已审核通过的（is_public=1 AND is_verified=1）。
 router.get('/messages', async (req, res) => {
   try {
-    const dbOk = await checkDbAvailable();
-    if (dbOk) {
-      const messages = await dbManager.query('SELECT * FROM guest_messages WHERE is_approved = 1 ORDER BY created_at DESC LIMIT 50');
-      return res.json({ success: true, data: messages, count: messages.length });
-    }
-    res.json({ success: true, data: MOCK_MESSAGES, count: MOCK_MESSAGES.length, source: 'mock' });
+    const messages = await dbManager.query('SELECT * FROM guest_messages WHERE is_public = 1 AND is_verified = 1 ORDER BY created_at DESC LIMIT 50');
+    return res.json({ success: true, data: messages, count: messages.length });
   } catch (error) {
-    res.json({ success: true, data: MOCK_MESSAGES, count: MOCK_MESSAGES.length, source: 'mock' });
+    return dbError(res, error, 'GET /messages');
   }
 });
 
@@ -189,14 +145,10 @@ router.post('/messages', (req, res) => {
 // 获取区块链记录
 router.get('/blockchain', async (req, res) => {
   try {
-    const dbOk = await checkDbAvailable();
-    if (dbOk) {
-      const records = await dbManager.query('SELECT * FROM blockchain_records ORDER BY created_at DESC LIMIT 20');
-      return res.json({ success: true, data: records, count: records.length });
-    }
-    res.json({ success: true, data: MOCK_BLOCKCHAIN, count: MOCK_BLOCKCHAIN.length, source: 'mock' });
+    const records = await dbManager.query('SELECT * FROM blockchain_records ORDER BY created_at DESC LIMIT 20');
+    return res.json({ success: true, data: records, count: records.length });
   } catch (error) {
-    res.json({ success: true, data: MOCK_BLOCKCHAIN, count: MOCK_BLOCKCHAIN.length, source: 'mock' });
+    return dbError(res, error, 'GET /blockchain');
   }
 });
 
@@ -208,11 +160,21 @@ router.post('/blockchain', authenticateToken(), (req, res) => {
 // ==================== 系统配置 ====================
 
 // 获取系统配置
+// 此前是漏网的假端点：不查库直接返回 { key, value: 'default' }。
+// 现查真实 system_config 表，只返回标记为公开（is_public=1）的配置；
+// 不存在或不公开返回 404，DB 异常返回 500。
 router.get('/config/:key', async (req, res) => {
   try {
-    res.json({ success: true, data: { key: req.params.key, value: 'default' }, source: 'mock' });
+    const rows = await dbManager.query(
+      'SELECT config_key, config_value, config_type FROM system_config WHERE config_key = ? AND is_public = 1',
+      [req.params.key]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ success: false, error: '配置不存在或不公开', code: 'CONFIG_NOT_FOUND' });
+    }
+    return res.json({ success: true, data: rows[0] });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return dbError(res, error, 'GET /config/:key');
   }
 });
 
@@ -223,15 +185,14 @@ router.put('/config/:key', authenticateToken(), (req, res) => {
 
 // ==================== 健康检查 ====================
 
+// DB 正常返回 200，DB 不可用返回 503（此前无论 DB 状态都返回 200 + mock，探针形同虚设）。
 router.get('/health', async (req, res) => {
   try {
-    const dbOk = await checkDbAvailable();
-    if (dbOk) {
-      return res.json({ success: true, database: 'connected', source: 'database' });
-    }
-    res.json({ success: true, database: 'mock', source: 'mock', message: '本地模拟模式' });
+    await dbManager.query('SELECT 1');
+    return res.json({ success: true, database: 'connected' });
   } catch (error) {
-    res.json({ success: true, database: 'mock', source: 'mock', message: '本地模拟模式（数据库异常）' });
+    console.error('[genealogy] GET /health error:', error.message);
+    return res.status(503).json({ success: false, database: 'disconnected', error: '数据库不可用' });
   }
 });
 

@@ -105,9 +105,14 @@ router.post('/chat/completions', authenticateToken(), async (req, res) => {
     // 构建提示词
     const prompt = buildPromptFromMessages(messages);
 
-    // 调用 CLI 前先查免费额度：超限直接返回明确提示
-    const quota = await quotaService.checkQuota();
+    // 原子预占额度：检查 + 扣减一次完成，杜绝并发超发（与 /api/chat、/api/conversation 同款；
+    // 旧的 checkQuota + recordUsage 是 check-then-act，并发请求会同时读到“还剩 1 次”全部放行）
+    const quota = await quotaService.checkAndReserve();
     if (!quota.available) {
+      // 429 响应里去掉预占的内部字段（reserved / windowKey）
+      const quotaPublic = { ...quota };
+      delete quotaPublic.reserved;
+      delete quotaPublic.windowKey;
       return res.status(429).json({
         error: {
           message: quota.reason || '免费额度已用完，请稍后再试',
@@ -115,16 +120,22 @@ router.post('/chat/completions', authenticateToken(), async (req, res) => {
           param: null,
           code: 'quota_exhausted',
         },
-        quota,
+        quota: quotaPublic,
       });
     }
 
-    // 调用 CLI
+    // 调用 CLI；失败时把预占的 1 次调用额度还回去（fail-open 下 reserved=false，退还为空操作）
     const { callQwenCli } = await import('../cli-wrapper.js');
-    const result = await callQwenCli(prompt, { model: chatModel, temperature: validTemp });
+    let result;
+    try {
+      result = await callQwenCli(prompt, { model: chatModel, temperature: validTemp });
+    } catch (cliError) {
+      await quotaService.refundReservation(quota.windowKey);
+      throw cliError;
+    }
 
-    // 记录本次用量（成功调用才计）
-    await quotaService.recordUsage(result.usage?.total_tokens || 0);
+    // 成功：按实际用量补记 Token（调用次数已在预占时扣过，不再重复计）
+    await quotaService.recordTokens(result.usage?.total_tokens || 0);
 
     if (stream) {
       // 流式响应

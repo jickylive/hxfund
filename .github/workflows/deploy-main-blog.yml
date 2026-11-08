@@ -148,6 +148,9 @@ jobs:
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
           port: ${{ secrets.FTP_PORT || 21 }}
+          # 必须显式 FTPS：不写 protocol 默认明文 FTP（21 端口），
+          # 旧版 workflow 写过 ftps，后来回归丢了，密码明文传输
+          protocol: ftps
           local-dir: ./dist/
           server-dir: /htdocs/
           exclude: |
@@ -190,6 +193,8 @@ jobs:
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
           port: ${{ secrets.FTP_PORT || 21 }}
+          # 必须显式 FTPS：不写 protocol 默认明文 FTP（21 端口），见上
+          protocol: ftps
           local-dir: blog/public/
           server-dir: /htdocs/blog/
           exclude: |

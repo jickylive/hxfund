@@ -8,6 +8,14 @@
  * 2. 优化静态资源
  * 3. 生成生产环境包
  * 4. 验证构建产物
+ *
+ * 注意（2026-11-08）：frontend/src/ 已冻结（见 frontend/README.md），线上跑 public/，
+ * 主构建 `npm run build`（scripts/build.js）已不再构建 frontend/src/。
+ * 但本脚本步骤 2–3 仍在构建 frontend/src/ 并把 frontend/dist/ 拷进 dist/，
+ * 因为本脚本的 dist/ 布局依赖 frontend/dist/index.html。
+ * 这是已知的遗留问题：彻底下线需重构本脚本的产物布局（改从 public/index.html
+ * 生成 dist/index.html），改动较大，留待后续单独处理。在那之前，日常部署请走
+ * `npm run build`（GitHub Actions 用的就是它），不要用本脚本。
  */
 
 import { execSync } from 'child_process';

@@ -14,8 +14,14 @@
  */
 
 // 初始化 Sentry 错误监控（首先加载）
+// initSentry 失败只记日志，不让监控初始化失败拖垮服务启动
+// （旧代码无 try/catch，Sentry 配错 DSN 或 API 不兼容时服务直接起不来）。
 const { initSentry, setupGlobalHandlers, setupExpressIntegration } = require('./sentry');
-initSentry();
+try {
+  initSentry();
+} catch (error) {
+  console.error('⚠️  Sentry 初始化失败，错误监控已禁用（服务继续启动）:', error.message);
+}
 setupGlobalHandlers();
 
 const express = require('express');
@@ -92,8 +98,9 @@ const PORT = process.env.PORT || 3000;
 // 本地开发无代理时该设置无副作用（直连地址不受影响）。
 app.set('trust proxy', 1);
 
-// 设置 Sentry Express 集成（在其他中间件之前）
-setupExpressIntegration(app);
+// 注意：Sentry Express 集成不在这里挂——v10 的 setupExpressErrorHandler 是错误处理中间件，
+// 必须放在全部路由之后（见文件末尾 app.use(errorHandler) 之前），挂早了捕获不到路由错误。
+// 请求追踪已由 Sentry.init 里的 expressIntegration 自动接管，无需手动挂中间件。
 
 // ============================================
 // 安全中间件
@@ -422,22 +429,32 @@ app.post('/api/chat', authMiddleware(), async (req, res) => {
       });
     }
 
-    // 调用 CLI 前先查免费额度：超限直接返回明确提示
-    const quota = await quotaService.checkQuota();
+    // 原子预占额度（与 /api/conversation 同款：检查 + 扣减一次完成，杜绝并发超发）
+    const quota = await quotaService.checkAndReserve();
     if (!quota.available) {
+      // 429 响应里去掉预占的内部字段（reserved / windowKey），只给客户端看额度状态
+      const quotaPublic = { ...quota };
+      delete quotaPublic.reserved;
+      delete quotaPublic.windowKey;
       return res.status(429).json({
         success: false,
         error: quota.reason || '免费额度已用完，请稍后再试',
         code: 'QUOTA_EXHAUSTED',
-        quota
+        quota: quotaPublic
       });
     }
 
-    // 调用 CLI 获取 AI 响应
-    const result = await callQwenCli(trimmedPrompt, { model, temperature });
+    // 调用 CLI 获取 AI 响应；失败时把预占的 1 次调用额度还回去
+    let result;
+    try {
+      result = await callQwenCli(trimmedPrompt, { model, temperature });
+    } catch (cliError) {
+      await quotaService.refundReservation(quota.windowKey);
+      throw cliError;
+    }
 
-    // 记录本次用量（成功调用才计）
-    await quotaService.recordUsage(result.usage?.total_tokens || 0);
+    // 成功：按实际用量补记 Token（调用次数已在预占时扣过，不再重复计）
+    await quotaService.recordTokens(result.usage?.total_tokens || 0);
     const responseTime = Date.now() - startTime;
 
     res.json({
@@ -556,22 +573,33 @@ app.post('/api/conversation', authMiddleware(), async (req, res) => {
 
     const fullPrompt = conversationContext + trimmedMessage;
 
-    // 调用 CLI 前先查免费额度：超限直接返回明确提示，不把请求发出去等上游报错
-    const quota = await quotaService.checkQuota();
+    // 原子预占额度：检查 + 扣减一次完成，杜绝并发超发。
+    // 旧的 checkQuota + recordUsage 是 check-then-act，并发请求会同时读到“还剩 1 次”全部放行。
+    const quota = await quotaService.checkAndReserve();
     if (!quota.available) {
+      // 429 响应里去掉预占的内部字段（reserved / windowKey），只给客户端看额度状态
+      const quotaPublic = { ...quota };
+      delete quotaPublic.reserved;
+      delete quotaPublic.windowKey;
       return res.status(429).json({
         success: false,
         error: quota.reason || '免费额度已用完，请稍后再试',
         code: 'QUOTA_EXHAUSTED',
-        quota
+        quota: quotaPublic
       });
     }
 
-    // 调用 CLI 获取 AI 响应
-    const result = await callQwenCli(fullPrompt, { model, temperature });
+    // 调用 CLI 获取 AI 响应；失败时把预占的 1 次调用额度还回去（fail-open 下 reserved=false，退还为空操作）
+    let result;
+    try {
+      result = await callQwenCli(fullPrompt, { model, temperature });
+    } catch (cliError) {
+      await quotaService.refundReservation(quota.windowKey);
+      throw cliError;
+    }
 
-    // 记录本次用量（成功调用才计）
-    await quotaService.recordUsage(result.usage?.total_tokens || 0);
+    // 成功：按实际用量补记 Token（调用次数已在预占时扣过，不再重复计）
+    await quotaService.recordTokens(result.usage?.total_tokens || 0);
 
     // 添加消息到历史
     session.messages.push({ role: 'user', content: trimmedMessage });
@@ -724,13 +752,35 @@ app.post('/api/models/switch', authMiddleware(), (req, res) => {
 
 /**
  * GET /api/health
- * 健康检查
+ * 健康检查（真检查：DB 与 Redis 任一不可用即返回 503）。
+ *
+ * 此前无论 DB / Redis 状态都返回 200，Docker / k8s / CI 的健康检查全是安慰剂。
+ * 现对 DB 做轻量查询（SELECT 1）、对 Redis 查连接状态，任一失败返回 503
+ * 并在 checks 里标明哪项失败；全部正常才返回 200。
+ * 注意：Redis 挂了服务仍可降级运行（会话走内存、额度 fail-open），
+ * 这里按严格口径返回 503——若编排器据此重启容器，需另行把 Redis 改为只告警不致命。
  */
 app.get('/api/health', async (req, res) => {
+  // 真检查：DB 轻量查询 + Redis 连接状态（并行做，互不拖累）
+  const [dbCheck, redisCheck] = await Promise.all([
+    dbManager.query('SELECT 1')
+      .then(() => ({ ok: true }))
+      .catch((error) => ({ ok: false, error: error.message })),
+    Promise.resolve(sessionStore.isRedisConnected())
+      .then((connected) => ({ ok: connected }))
+      .catch(() => ({ ok: false }))
+  ]);
+
+  const checks = {
+    database: dbCheck.ok ? 'ok' : 'fail',
+    redis: redisCheck.ok ? 'ok' : 'fail'
+  };
+  const healthy = dbCheck.ok && redisCheck.ok;
+
   const cliConfigured = isCliConfigured();
   const cliConfig = getCliConfig();
   const authConfig = loadAuthConfig();
-  const redisConnected = sessionStore.isRedisConnected();
+  const redisConnected = redisCheck.ok;
   const walineEnabled = true;
 
   // 获取会话数量
@@ -745,8 +795,9 @@ app.get('/api/health', async (req, res) => {
   // 提供默认模型前先查免费额度：超限则 modelAvailable=false，前端据此提示用户稍后再试
   const modelStatus = await quotaService.getDefaultModelStatus(cliConfig?.model);
 
-  res.json({
-    status: 'ok',
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'unhealthy',
+    checks,
     service: 'huangshi-genealogy-api',
     version: '3.2.0 (Redis + Security + Waline)',
     timestamp: new Date().toISOString(),
@@ -797,6 +848,10 @@ app.get('/api/docs', (req, res) => {
 
 // 404 处理
 app.use(notFoundHandler);
+
+// Sentry Express 错误处理（v10：必须在全部路由之后、应用自身 errorHandler 之前，
+// 否则路由里抛出的错误到不了 Sentry）
+setupExpressIntegration(app);
 
 // 统一错误处理
 app.use(errorHandler);

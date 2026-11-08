@@ -142,7 +142,12 @@ function isValidJS(code) {
 // 压缩 JS（使用 terser）
 async function processJS() {
     console.log('\n📄 处理 JS 文件...');
-    const jsFiles = ['data.js', 'main.js', 'modules.js', 'script.js'];
+    // 注意：这里必须列出 public/js/ 下的全部 6 个文件。
+    // 2026-11-08 前漏了 error-monitor.js 与 web-vitals.js，导致线上这两个文件 404：
+    // 错误监控全灭，且 Service Worker 预缓存（public/pwa/service-worker.js 的
+    // cache.addAll，全有或全无）因 error-monitor.js 缺失而整体失效。
+    // 以后 public/js/ 新增文件必须同步加进这个列表，否则构建不会拷到 dist/。
+    const jsFiles = ['data.js', 'error-monitor.js', 'main.js', 'modules.js', 'script.js', 'web-vitals.js'];
     const stats = [];
 
     for (const file of jsFiles) {
@@ -346,47 +351,8 @@ async function backupSessionData() {
     }
 }
 
-// 构建 Vite 前端
-async function buildFrontend() {
-    console.log('\n╔═══════════════════════════════════════════════════════════╗');
-    console.log('║     构建 Vite 前端 (frontend/src)                         ║');
-    console.log('╚═══════════════════════════════════════════════════════════╝\n');
-
-    const FRONTEND_DIR = path.join(__dirname, '..', 'frontend', 'src');
-    const frontendDist = path.join(__dirname, '..', 'frontend', 'dist');
-
-    if (!fs.existsSync(path.join(FRONTEND_DIR, 'package.json'))) {
-        console.log('  ℹ️  frontend/src 目录不存在，跳过前端构建');
-        return;
-    }
-
-    try {
-        console.log('🔨 安装前端依赖...');
-        execSync('npm install', {
-            cwd: FRONTEND_DIR,
-            stdio: 'inherit'
-        });
-
-        console.log('🔨 构建 Vite 前端...');
-        execSync('npm run build', {
-            cwd: FRONTEND_DIR,
-            stdio: 'inherit'
-        });
-
-        console.log('✅ 前端构建完成');
-
-        // 复制前端构建产物到 dist/
-        if (fs.existsSync(frontendDist)) {
-            console.log('📁 复制前端构建产物到 dist/...');
-            copyDir(frontendDist, path.join(__dirname, '..', 'dist'));
-        }
-
-    } catch (error) {
-        // 构建失败必须终止整个流程：此前只打日志继续跑，CI 显示成功，坏产物照常上线
-        console.error('❌ 前端构建失败，终止构建:', error.message);
-        throw error;
-    }
-}
+// 注意：构建 Vite 前端（frontend/src/）的 buildFrontend() 函数已于 2026-11-08 删除。
+// frontend/src/ 已冻结（见 frontend/README.md），线上跑 public/，不再构建、不再部署。
 
 // 构建 Hexo 博客
 async function buildBlog() {
@@ -451,8 +417,10 @@ async function build() {
     console.log('  ✓ dist/js/');
     console.log('  ✓ dist/images/');
 
-    // 构建 Vite 前端
-    await buildFrontend();
+    // 注意：不再构建 Vite 前端（frontend/src/ 已冻结，见 frontend/README.md）。
+    // 线上跑的是 public/ 这一套，frontend/src/ 的产物（frontend/dist/）没人加载，
+    // 每次构建还白跑一遍 Vite 并把 5 份带哈希的旧 main.[hash].js 死文件拷进 dist/。
+    // 旧的 buildFrontend() 函数已随本次冻结删除（git 历史可找回）。
 
     // 复制图片等静态资源
     console.log('\n📁 复制静态资源...');

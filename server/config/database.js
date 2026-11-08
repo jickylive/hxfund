@@ -45,8 +45,8 @@ const mysqlConfig = {
   })() : false,
 };
 
-// 构建连接 URL（方便某些 ORM 使用）
-mysqlConfig.connectionUrl = `mysql://${mysqlConfig.user}:${encodeURIComponent(mysqlConfig.password)}@${mysqlConfig.host}:${mysqlConfig.port}/${mysqlConfig.database}?charset=${mysqlConfig.charset}&timezone=+0800`;
+// 注意：connectionUrl 已于 2026-11-08 删除。原因：全仓无人使用，且它把明文密码拼进 URL
+//（一旦被日志打印即泄露）。如需连接串，请调用方自行用 mysqlConfig 的各字段拼接。
 
 // ============================================
 // 导出配置

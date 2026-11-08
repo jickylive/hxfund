@@ -3,10 +3,12 @@
  * 直接连接到现有数据库并创建表
  */
 
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '..', 'server', 'config', '.env') });
 const mysql = require('mysql2/promise');
-const fs = require('fs');
 const path = require('path');
+// 初始化 = 执行版本化迁移（database/schema/ 001-010），见 scripts/migrate.js。
+// 旧路径 scripts/database/legacy/init-simple.sql 早已不存在，初始化即报错，
+// 所以这里不再直接读 SQL 文件，改调迁移执行器。
 
 async function initializeDatabase() {
   console.log('===========================================');
@@ -62,78 +64,29 @@ async function initializeDatabase() {
 
     console.log('✅ 连接成功！\n');
 
-    // 读取 SQL 文件
-    const sqlFile = path.join(__dirname, 'database', 'legacy', 'init-simple.sql');
-    
-    if (!fs.existsSync(sqlFile)) {
-      console.error(`❌ 错误：SQL 文件不存在：${sqlFile}`);
-      process.exit(1);
-    }
-
-    console.log('📄 读取 SQL 文件:', sqlFile);
-    let sqlContent = fs.readFileSync(sqlFile, 'utf8');
-    
-    // 处理 SQL 语句
-    console.log('   处理 SQL 语句...');
-    
-    // 移除 CREATE DATABASE 和 USE 语句（因为已经连接到了目标数据库）
-    sqlContent = sqlContent
-      .replace(/CREATE DATABASE IF NOT EXISTS `?\w+`?[^;]*;/gi, '')
-      .replace(/USE `?\w+`?;/gi, '');
-    
-    // 分割 SQL 语句
-    const statements = sqlContent
-      .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
-
-    console.log(`   找到 ${statements.length} 条 SQL 语句\n`);
-
-    // 执行 SQL 语句
-    console.log('🔧 开始执行 SQL 语句...\n');
-    
-    let executed = 0;
-    let errors = 0;
-
-    for (let i = 0; i < statements.length; i++) {
-      const statement = statements[i];
-      
-      try {
-        // 跳过空语句和注释
-        if (!statement || statement.startsWith('--') || statement.startsWith('/*')) {
-          continue;
-        }
-
-        await connection.query(statement);
-        executed++;
-        
-        // 显示进度
-        if ((i + 1) % 5 === 0 || i === statements.length - 1) {
-          process.stdout.write(`\r   进度：${i + 1}/${statements.length}`);
-        }
-      } catch (error) {
-        // 忽略"已存在"错误
-        if (error.code === 'ER_TABLE_EXISTS_ERROR' || error.code === 'ER_DUP_FIELDNAME') {
-          console.warn(`   ⚠️  跳过（已存在）`);
-        } else {
-          console.error(`\n   ❌ 错误 (${i + 1}/${statements.length}):`, error.message.substring(0, 100));
-          errors++;
-        }
-      }
-    }
-
-    console.log('\n');
+    // 执行版本化迁移（database/schema/ 001-010，按编号顺序，未执行的才跑，
+    // 已执行的记在 schema_migrations 表，重复执行自动跳过）
+    const { runMigrations } = require('./migrate');
+    const result = await runMigrations();
+    const executed = result.executed;
+    const errors = 0;
 
     // 验证结果
     console.log('📊 验证初始化结果...\n');
     
     const tables = [
+      'users',
+      'sessions',
+      'ai_conversations',
       'family_members',
       'generation_poems',
       'project_slides',
       'blockchain_records',
       'guest_messages',
-      'system_config'
+      'system_config',
+      'waline_comments',
+      'waline_article_stats',
+      'schema_migrations'
     ];
 
     for (const table of tables) {
@@ -150,7 +103,7 @@ async function initializeDatabase() {
     console.log('===========================================\n');
     
     console.log('📋 统计信息:');
-    console.log(`   执行 SQL 语句：${executed} 条`);
+    console.log(`   本次执行迁移文件：${executed} 个`);
     console.log(`   错误：${errors} 个`);
     console.log('');
 

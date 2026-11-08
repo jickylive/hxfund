@@ -166,21 +166,9 @@ class DatabaseManager {
   /**
    * 批量插入
    */
-  async batchInsert(table, data) {
-    if (!Array.isArray(data) || data.length === 0) {
-      throw new Error('数据必须是非空数组');
-    }
-
-    const keys = Object.keys(data[0]);
-    const values = data.map(row => keys.map(key => row[key]));
-    
-    // 使用 multiStatements 进行批量插入
-    const insertValues = values.map(v => `(${keys.map(() => '?').join(', ')})`).join(', ');
-    const flatValues = values.flat();
-    const batchSql = `INSERT INTO ${table} (${keys.join(', ')}) VALUES ${insertValues}`;
-    
-    return await this.query(batchSql, flatValues);
-  }
+  /**
+   * 注意：batchInsert() 已于 2026-11-08 删除。原因：全仓无人调用，且表名直接拼进 SQL
+   * 有注入隐患（`INSERT INTO ${table}`）。如需批量插入，请用参数化查询逐条写。
 
   /**
    * 检查是否是连接错误
