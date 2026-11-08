@@ -19,8 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let sessionId = null;
     let totalTokens = 0;
-    let authToken = null;
-    let tokenExpiresAt = null;
     let isSending = false;
     // 当前模型：由后端 /api/health 下发；未取到时用后端默认值兜底
     let currentModel = 'deepseek-ai/DeepSeek-V4-Flash';
@@ -100,99 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 加载已保存的 Token（只存 Token，不再存模型/温度）
-    function loadSavedToken() {
-        // 优先从 sessionStorage 加载 Token（更安全）
-        const sessionToken = sessionStorage.getItem('authToken');
-        const sessionExpires = sessionStorage.getItem('tokenExpiresAt');
-
-        if (sessionToken && sessionExpires) {
-            const expiresAt = parseInt(sessionExpires);
-            if (expiresAt > Date.now()) {
-                authToken = sessionToken;
-                tokenExpiresAt = expiresAt;
-                console.log('✓ 已加载 session 中的认证 Token');
-                return;
-            }
-        }
-
-        // sessionStorage 无有效 Token，尝试从 localStorage 加载
-        const config = safeParseConfig(localStorage.getItem('qwenConfig'));
-        if (config.token && config.tokenExpiresAt && config.tokenExpiresAt > Date.now()) {
-            authToken = config.token;
-            tokenExpiresAt = config.tokenExpiresAt;
-            console.log('✓ 已加载 localStorage 中的认证 Token');
-        }
-    }
-
-    // 保存 Token（只存 Token）
-    function saveToken() {
-        const config = {
-            token: authToken,
-            tokenExpiresAt: tokenExpiresAt
-        };
-        try { localStorage.setItem('qwenConfig', JSON.stringify(config)); } catch (e) { console.warn('保存 Token 失败:', e.message); }
-    }
-
-    // 获取认证 Token
-    async function getAuthToken() {
-        // 如果已有有效 Token，直接返回
-        if (authToken && tokenExpiresAt && tokenExpiresAt > Date.now()) {
-            return authToken;
-        }
-
-        try {
-            const apiBaseUrl = getApiBaseUrl();
-
-            // 从服务器代理端点获取新 Token（不暴露 API Key）
-            const response = await fetch(`${apiBaseUrl}/api/auth/client-token`, {
-                method: 'POST',
-                // 注意：不要加 'Cache-Control' 请求头——它不是 CORS 安全列表头，
-                // 会触发预检，而服务端 Allow-Headers 不含 cache-control，
-                // 预检失败导致整个请求报 Failed to fetch（2026-11-07 事故）。
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include' // 包含cookies和其他认证信息
-            });
-
-            if (!response.ok) {
-                // 尝试解析错误响应
-                let errorData = {};
-                try {
-                    errorData = await response.json();
-                } catch (parseError) {
-                    // 如果响应不是JSON，使用状态文本
-                    errorData = { error: response.statusText, status: response.status };
-                }
-
-                throw new Error(`获取 Token 失败：${errorData.error || response.status}`);
-            }
-
-            const data = await response.json();
-            if (data.success) {
-                authToken = data.token;
-                tokenExpiresAt = Date.now() + data.expiresIn;
-
-                // 保存 Token 到 sessionStorage（更安全，会话结束自动清除）
-                sessionStorage.setItem('authToken', authToken);
-                sessionStorage.setItem('tokenExpiresAt', tokenExpiresAt.toString());
-
-                // 同时保存到 localStorage（用于持久化）
-                saveToken();
-
-                console.log('✓ 已获取新的认证 Token');
-                return authToken;
-            } else {
-                console.warn('Token 获取失败:', data.error);
-                return null;
-            }
-        } catch (error) {
-            // 只记日志不插消息：由调用方（发送/刷新按钮）统一展示，避免一次失败出两条气泡
-            console.error('获取认证 Token 失败:', error.message);
-            return null;
-        }
-    }
+    // 认证 Token 相关函数已删除（2026-11-08）：
+    // /api/chat 与 /api/conversation 已改为公开端点（仍受限流与额度检查保护），
+    // 前端不再需要先向 /api/auth/client-token 取 token。
+    // 该端点本身无认证签发 JWT（curl 就能拿到合法 token），认证形同虚设，故直接删掉。
+    // 旧的 localStorage/sessionStorage 里的 token 不再使用，留着无害。
 
     // 添加消息（内容先转义再插 innerHTML，防 XSS；换行转 <br> 保留排版）
     function addMessage(role, content) {
@@ -209,25 +119,14 @@ document.addEventListener('DOMContentLoaded', () => {
         qwenMessages.scrollTop = qwenMessages.scrollHeight;
     }
 
-    // 调用后端 API (多轮对话，带认证)
+    // 调用后端 API (多轮对话，无需认证；公开端点，靠限流 + 额度检查保护)
     async function callConversationAPI(message, model, temperature) {
-        // 确保有有效的 Token
-        const token = await getAuthToken();
-
-        // 如果获取不到 token，返回错误信息
-        if (!token) {
-            throw new Error('无法获取认证令牌，请检查网络连接或联系管理员');
-        }
-
         const apiBaseUrl = getApiBaseUrl();
 
         // 构建请求头（不加 Cache-Control，见上文 CORS 预检说明）
         const headers = {
             'Content-Type': 'application/json'
         };
-        if (token) {
-            headers['Authorization'] = 'Bearer ' + token;
-        }
 
         try {
             const response = await fetch(`${apiBaseUrl}/api/conversation`, {
@@ -243,36 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) {
                 const error = await response.json().catch(() => ({ error: '请求失败' }));
-
-                // Token 过期，尝试重新获取
-                if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
-                    console.log('Token 已过期，尝试重新获取...');
-                    authToken = null;
-                    tokenExpiresAt = null;
-                    const newToken = await getAuthToken();
-
-                    if (newToken) {
-                        // 重试请求
-                        const retryResponse = await fetch(`${apiBaseUrl}/api/conversation`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + newToken
-                            },
-                            body: JSON.stringify({
-                                message,
-                                sessionId,
-                                model,
-                                temperature: parseFloat(temperature)
-                            })
-                        });
-
-                        if (!retryResponse.ok) {
-                            throw new Error('请求失败，请刷新页面重试');
-                        }
-                        return retryResponse.json();
-                    }
-                }
 
                 throw new Error(error.error || `HTTP ${response.status}`);
             }
@@ -367,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 添加刷新认证按钮功能
+    // 添加刷新连接按钮功能（改：不再取 token，改为 ping /api/health 测连通性）
     const refreshTokenBtn = document.createElement('button');
     refreshTokenBtn.className = 'btn-outline';
     refreshTokenBtn.innerHTML = '<span>🔄 刷新连接</span>';
@@ -380,24 +249,20 @@ document.addEventListener('DOMContentLoaded', () => {
         qwenInputFooter.appendChild(refreshTokenBtn);
 
         refreshTokenBtn.addEventListener('click', async () => {
-            // 清除现有令牌
-            authToken = null;
-            tokenExpiresAt = null;
-            sessionStorage.removeItem('authToken');
-            sessionStorage.removeItem('tokenExpiresAt');
-
-            // 尝试获取新令牌
-            const newToken = await getAuthToken();
-            if (newToken) {
-                addMessage('ai', '✅ 连接已刷新，可以继续使用 AI 服务。');
-            } else {
-                addMessage('ai', '❌ 连接刷新失败，请检查网络或稍后重试。');
+            try {
+                const res = await fetch(`${getApiBaseUrl()}/api/health`);
+                if (res.ok) {
+                    addMessage('ai', '✅ 连接正常，可以继续使用 AI 服务。');
+                } else {
+                    addMessage('ai', '❌ 服务暂时不可用，请稍后重试。');
+                }
+            } catch (e) {
+                addMessage('ai', '❌ 连接失败，请检查网络或稍后重试。');
             }
         });
     }
 
-    // 初始化：加载已保存的 Token，并从 /api/health 获取当前模型
-    loadSavedToken();
+    // 初始化：从 /api/health 获取当前模型
     loadHealthModel();
 
     console.log('✅ Qwen AI 客户端已加载 (简化版 v4.0.0)');

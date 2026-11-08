@@ -336,56 +336,11 @@ app.post('/api/auth/token', (req, res) => {
 });
 
 /**
- * POST /api/auth/client-token
- * 客户端获取 Token 的代理端点（同源请求）
- * 前端通过此端点间接获取 Token，不暴露 API Key
+ * POST /api/auth/client-token —— 已删除（2026-11-08）
+ * 原因：该端点无认证签发 JWT（不带 Origin 头即放行，curl 就能拿到合法 token），
+ * 认证形同虚设。/api/chat 与 /api/conversation 已改为公开端点（仍受限流与额度检查保护），
+ * 前端不再需要先取 token。详见 server/auth.js 的 publicPaths。
  */
-app.post('/api/auth/client-token', (req, res) => {
-  const config = loadAuthConfig();
-
-  // 验证请求来源（同源检查）
-  const origin = req.headers.origin;
-  const referer = req.headers.referer;
-
-  // 允许同源请求（localhost 或配置的域名）
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',')
-    : ['http://localhost:3000', 'http://127.0.0.1:3000'];
-
-  // 严格验证域名（防止绕过）
-  const isExactMatch = origin && allowedOrigins.indexOf(origin) !== -1;
-  const isHxfundDomain = origin && /^https?:\/\/([\w-]+\.)*hxfund\.cn(:\d+)?$/.test(origin);
-  const isMy3wDomain = origin && /^https?:\/\/([\w-]+\.)*my3w\.com(:\d+)?$/.test(origin);
-  const isApiHxfundDomain = origin === 'https://api.hxfund.cn';
-  const isRefererValid = referer && (referer.includes('localhost') || referer.includes('hxfund.cn') || referer.includes('api.hxfund.cn'));
-
-  // 允许不带 origin 的请求（同源请求）
-  const isAllowed = !origin || isExactMatch || isHxfundDomain || isMy3wDomain || isApiHxfundDomain || isRefererValid;
-
-  if (!isAllowed) {
-    return res.status(403).json({
-      success: false,
-      error: '跨域请求禁止',
-      code: 'CORS_FORBIDDEN'
-    });
-  }
-
-  // 生成 Token（使用服务器 API Key）
-  const token = generateToken(
-    {
-      type: 'client_access',
-      source: 'web'
-    },
-    config.jwtSecret
-  );
-
-  res.json({
-    success: true,
-    token,
-    expiresIn: config.tokenExpiresIn,
-    tokenType: 'Bearer'
-  });
-});
 
 /**
  * GET /api/auth/status
@@ -627,6 +582,10 @@ app.post('/api/conversation', authMiddleware(), async (req, res) => {
     if (session.messages.length > 40) {
       session.messages = session.messages.slice(-40);
     }
+
+    // 写回会话（修复多轮记忆丢失：之前 push 后从不写回，
+    // Redis 下 getSession 返回的是副本，历史恒为空，每轮都从零开始）
+    await sessionStore.setSession(sessionId, session);
 
     const responseTime = Date.now() - startTime;
 

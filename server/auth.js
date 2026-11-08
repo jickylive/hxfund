@@ -338,6 +338,13 @@ function authMiddleware(options = {}) {
       return next();
     }
 
+    // 公开端点（AI 聊天）：无需认证，但仍受限流与额度检查保护。
+    // 原因：/api/auth/client-token 曾无认证签发 JWT（curl 就能拿到合法 token），
+    // 认证形同虚设；这些是公开网站的公开功能，真正的防护是限流 + 额度检查。
+    // 注意：这里只跳过“认证”，下面的限流检查对公开端点同样执行。
+    const publicPaths = ['/api/chat', '/api/conversation'];
+    const isPublicPath = publicPaths.includes(req.path);
+
     // 获取请求头中的认证信息
     const authHeader = req.headers.authorization;
     const apiKeyHeader = req.headers['x-api-key'];
@@ -349,6 +356,7 @@ function authMiddleware(options = {}) {
       return next();
     }
 
+    if (!isPublicPath) {
     // 验证 API Key 或 Token（同源请求也需要认证，防止 CSRF）
     if (!apiKeyHeader && !authHeader) {
       return res.status(401).json({
@@ -399,6 +407,7 @@ function authMiddleware(options = {}) {
           code: 'INVALID_SIGNATURE'
         });
       }
+    }
     }
 
     // 速率限制检查
