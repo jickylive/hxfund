@@ -39,23 +39,10 @@ function sensitiveDataFilter(req, res, next) {
   next();
 }
 
-/**
- * 请求日志脱敏中间件
- * 确保日志中不记录敏感信息
- */
-function logSanitizer(req, res, next) {
-  // 过滤请求体中的敏感数据
-  if (req.body) {
-    req.body = maskObject(req.body);
-  }
-  
-  // 过滤查询参数中的敏感数据
-  if (req.query) {
-    req.query = maskObject(req.query);
-  }
-  
-  next();
-}
+// 注意：日志脱敏不在这里做。本模块曾提供 logSanitizer 中间件原地改写
+// req.body/req.query，但它在 bodyParser 之前装配（body 分支是死代码），
+// query 分支又会破坏读取原值的路由。脱敏现在统一在 httpLogger 记录时
+// 对副本执行（见 middleware/http-logger.js）。
 
 /**
  * 请求 ID 生成中间件
@@ -295,7 +282,6 @@ function enhancedRateLimit(options = {}) {
 
 module.exports = {
   sensitiveDataFilter,
-  logSanitizer,
   requestId,
   securityHeaders,
   requestSizeLimit,

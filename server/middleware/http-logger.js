@@ -4,6 +4,7 @@
  */
 
 const logger = require('../config/logger');
+const { maskObject } = require('../config/security');
 
 /**
  * HTTP 请求日志中间件
@@ -21,9 +22,10 @@ function httpLogger(req, res, next) {
     contentLength: req.get('content-length'),
   };
 
-  // 记录查询参数（过滤敏感信息）
+  // 记录查询参数（对副本脱敏后再记录，不修改 req.query 原值——
+  // 路由处理器仍需要完整的原始参数）
   if (req.query && Object.keys(req.query).length > 0) {
-    requestInfo.query = req.query;
+    requestInfo.query = maskObject({ ...req.query }, { email: 'email', phone: 'phone' });
   }
 
   // 监听响应完成事件
