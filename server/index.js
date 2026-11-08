@@ -85,6 +85,11 @@ const dbManager = require('./config/db-manager');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 生产环境位于 Cloudflare 之后：信任第一跳代理，使 req.ip 为真实客户端 IP
+// 而非 Cloudflare 出口 IP（否则所有限流器会把全体访客算进同一个 IP 桶）。
+// 本地开发无代理时该设置无副作用（直连地址不受影响）。
+app.set('trust proxy', 1);
+
 // 设置 Sentry Express 集成（在其他中间件之前）
 setupExpressIntegration(app);
 
@@ -123,12 +128,16 @@ app.use(helmet({
   },
 }));
 
-// 增强速率限制（IP + 用户双重限制）
+// 全局速率限制（IP 维度，固定窗口）
+// 生效的限流策略共两层：
+//   1) 本限流器：全体端点（health/docs/models 除外），每 IP 100 次 / 15 分钟
+//   2) auth.js RateLimiter（authMiddleware 内）：已认证端点，普通 30 次/分钟、
+//      聊天 10 次/分钟，每 IP
+// 按用户的细分限制待用户体系（users 表）落地后引入，
+// 见 middleware/security.js enhancedRateLimit 注释。
 const limiter = enhancedRateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
   maxRequests: 100, // 每个IP最多100次请求
-  maxRequestsPerUser: 30, // 每个用户最多30次请求
-  skipSuccessfulRequests: false,
 });
 app.use(limiter);
 
