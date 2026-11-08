@@ -127,8 +127,10 @@ class PerformanceMonitor {
     const cpuUsage = process.cpuUsage();
     this.metrics.cpu.usage = (cpuUsage.user + cpuUsage.system) / 1000000; // 转换为秒
     
-    // 内存警告
-    if (this.metrics.memory.percentage > 80) {
+    // 内存警告：按 Node 堆利用率算。小堆应用（堆约 36MB）常驻 32MB 左右，
+    // 80% 的阈值会每 30 秒误报一次；提到 90% 后只有真正吃紧时才告警。
+    // 容器限额 256M，实际用量 32M 左右，并不紧张。
+    if (this.metrics.memory.percentage > 90) {
       logger.warn('内存使用率过高', {
         percentage: this.metrics.memory.percentage.toFixed(2),
         used: this.metrics.memory.used.toFixed(2),

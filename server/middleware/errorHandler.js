@@ -53,16 +53,29 @@ function errorHandler(err, req, res, next) {
   let error = { ...err };
   error.message = err.message;
 
-  // 记录错误日志
-  logger.error('错误处理', {
-    error: error.message,
-    code: error.code || 'UNKNOWN',
-    statusCode: error.statusCode || 500,
-    stack: err.stack,
-    url: req.url,
-    method: req.method,
-    ip: req.ip,
-  });
+  // 按状态码分级记日志：4xx 是客户端问题（404 扫描器、缺 favicon 等），
+  // 记 warn 且不打堆栈，避免日志被噪音淹没；只有 5xx 才记 error 并带堆栈。
+  const statusCode = error.statusCode || 500;
+  if (statusCode >= 500) {
+    logger.error('错误处理', {
+      error: error.message,
+      code: error.code || 'UNKNOWN',
+      statusCode,
+      stack: err.stack,
+      url: req.url,
+      method: req.method,
+      ip: req.ip,
+    });
+  } else {
+    logger.warn('请求错误', {
+      error: error.message,
+      code: error.code || 'UNKNOWN',
+      statusCode,
+      url: req.url,
+      method: req.method,
+      ip: req.ip,
+    });
+  }
 
   // 如果是应用错误，直接使用
   if (err instanceof AppError) {
