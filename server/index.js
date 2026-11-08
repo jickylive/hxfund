@@ -57,7 +57,8 @@ const {
   initAuthConfig,
   loadAuthConfig,
   generateTokenHandler,
-  generateToken
+  generateToken,
+  safeEqual
 } = require('./auth');
 
 // 引入 Redis 会话存储
@@ -320,7 +321,7 @@ app.post('/api/auth/token', (req, res) => {
   const { apiKey: clientKey } = req.body;
 
   // 验证客户端密钥（防止未授权调用）
-  if (!clientKey || clientKey !== config.serverApiKey) {
+  if (!clientKey || !safeEqual(clientKey, config.serverApiKey)) {
     return res.status(403).json({
       success: false,
       error: '无效的客户端密钥',
