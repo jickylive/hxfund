@@ -346,9 +346,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // 模块五：宗亲留言墙
     // =========================================
 
-    // API 基础地址：留言墙必须调 api 子域，相对路径会走到 www 主机上 404
+    // API 基础地址：生产走 api 子域（相对路径会打到 www 主机 404）；本地调试走同源
     const apiBaseUrl = window.API_CONFIG?.baseURL ||
-        (window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
+        ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? window.location.origin : 'https://api.hxfund.cn');
 
     // 格式化留言时间
     function formatGuestTime(createdAt) {

@@ -5,7 +5,7 @@
 
 export class QwenApiClient {
   constructor(baseURL) {
-    this.baseURL = baseURL || window.API_CONFIG?.baseURL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:3000' : 'https://api.hxfund.cn');
+    this.baseURL = baseURL || window.API_CONFIG?.baseURL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? window.location.origin : 'https://api.hxfund.cn');
     this.authToken = null;
     this.tokenExpiresAt = null;
     
