@@ -474,6 +474,29 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 留言墙“回复”按钮（2026-11-08 修复：之前只渲染了按钮，没绑点击事件，点它没反应）。
+    // 后端留言没有楼中楼（无 parent_id），所以点击后把 @用户名 带进输入框并聚焦，
+    // 让用户在正文里回复对方；用事件委托绑在列表容器上，列表重新渲染后依然有效。
+    const guestListEl = document.getElementById('guestList');
+    if (guestListEl) {
+        guestListEl.addEventListener('click', (e) => {
+            const replyBtn = e.target.closest('.guest-reply');
+            if (!replyBtn) return;
+            const item = replyBtn.closest('.guest-item');
+            const name = item?.querySelector('.guest-name')?.textContent?.trim() || '宗亲';
+            const mention = `@${name} `;
+            if (guestInput) {
+                if (!guestInput.value.includes(mention)) {
+                    guestInput.value = mention + guestInput.value;
+                }
+                guestInput.focus();
+                if (charCount) charCount.textContent = `${guestInput.value.length}/300`;
+            }
+            const guestForm = guestInput?.closest('section') || guestInput;
+            guestForm?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+    }
+
     // Initialize guest list when DOM is loaded
     renderGuestList();
 });
