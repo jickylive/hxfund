@@ -13,6 +13,9 @@ desktop.ini
 *.suo
 *.user
 
+# AtomCode 本地配置（个人目录，不入库）
+.atomcode/
+
 # Logs
 *.logs
 npm-debug.log*
