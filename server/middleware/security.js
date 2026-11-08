@@ -209,23 +209,30 @@ function ipWhitelist(allowedIPs = []) {
 }
 
 /**
- * 请求频率限制增强
- * 基于用户和 IP 的双重限制
+ * 全局请求频率限制（IP 维度，固定窗口）
+ *
+ * 设计说明：
+ * - 仅按 IP 限制。本服务暂无真实用户体系（users 表为空），此前的"用户维度"
+ *   只能取到 'anonymous'，等于全体访客共享一个全局上限——与 Cloudflare 后
+ *   缺少 trust proxy 叠加，是生产 429 误伤的根因之一。用户体系落地后再引入
+ *   按用户限制。
+ * - 固定窗口（windowStart + windowMs）到期清零。此前实现每次请求刷新
+ *   timestamp，活跃 IP 的计数永不重置，触发上限后一直 429 直到服务重启。
+ * - 生产位于 Cloudflare 后，需 app.set('trust proxy', 1)（index.js 已设置），
+ *   否则 req.ip 是代理出口 IP，全体访客落入同一桶。
  */
 function enhancedRateLimit(options = {}) {
   const {
     windowMs = 60 * 1000, // 1 分钟
     maxRequests = 30,
-    maxRequestsPerUser = 10,
     skipSuccessfulRequests = false,
   } = options;
-  
+
   const requests = new Map();
-  
+
   return (req, res, next) => {
     // 跳过公开端点（健康检查、文档、模型列表），避免 Docker 健康检查
-    // 与高频公开查询触发限流导致容器被判 unhealthy（/api/health 每 30s 一次，
-    // 15 分钟即达 anonymous 用户 30 次上限）
+    // 与高频公开查询触发限流导致容器被判 unhealthy
     const skipPaths = ['/api/health', '/api/docs', '/api/models'];
     if (skipPaths.includes(req.path)) {
       return next();
@@ -233,62 +240,43 @@ function enhancedRateLimit(options = {}) {
 
     const now = Date.now();
     const ip = req.ip || req.connection.remoteAddress;
-    const userId = req.user?.id || req.session?.userId || 'anonymous';
-    
-    // 清理过期记录
+
+    // 清理过期窗口
     for (const [key, data] of requests.entries()) {
-      if (now - data.timestamp > windowMs) {
+      if (now - data.windowStart > windowMs) {
         requests.delete(key);
       }
     }
-    
-    // IP 限制
+
+    // 固定窗口到期则重置计数
     const ipKey = `ip:${ip}`;
-    const ipData = requests.get(ipKey) || { count: 0, timestamp: now };
-    
+    let ipData = requests.get(ipKey);
+    if (!ipData || now - ipData.windowStart >= windowMs) {
+      ipData = { count: 0, windowStart: now };
+      requests.set(ipKey, ipData);
+    }
+
     if (ipData.count >= maxRequests) {
       logger.warn('IP 请求频率超限', { ip, count: ipData.count });
       return res.status(429).json({
         success: false,
         error: '请求过于频繁',
         code: 'RATE_LIMIT_EXCEEDED',
-        retryAfter: Math.ceil((windowMs - (now - ipData.timestamp)) / 1000)
+        retryAfter: Math.ceil((ipData.windowStart + windowMs - now) / 1000)
       });
     }
-    
-    // 用户限制
-    const userKey = `user:${userId}`;
-    const userData = requests.get(userKey) || { count: 0, timestamp: now };
-    
-    if (userData.count >= maxRequestsPerUser) {
-      logger.warn('用户请求频率超限', { userId, count: userData.count });
-      return res.status(429).json({
-        success: false,
-        error: '请求过于频繁',
-        code: 'RATE_LIMIT_EXCEEDED',
-        retryAfter: Math.ceil((windowMs - (now - userData.timestamp)) / 1000)
-      });
-    }
-    
-    // 更新计数
+
     ipData.count++;
-    ipData.timestamp = now;
-    requests.set(ipKey, ipData);
-    
-    userData.count++;
-    userData.timestamp = now;
-    requests.set(userKey, userData);
-    
+
     // 成功请求后减少计数（可选）
     if (skipSuccessfulRequests) {
       res.on('finish', () => {
         if (res.statusCode < 400) {
           ipData.count--;
-          userData.count--;
         }
       });
     }
-    
+
     next();
   };
 }
