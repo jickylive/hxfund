@@ -272,6 +272,8 @@ module.exports = {
   closeRedis,
   isRedisConnected: () => isRedisConnected,
   initRedis,
+  // 供额度统计等其他服务复用同一条 Redis 连接；未连接时返回 null，调用方须自行降级（放行）
+  getRedisClient: () => (isRedisConnected && redisClient ? redisClient : null),
   // 备份相关方法
   backupSessions,
   restoreSessions,
