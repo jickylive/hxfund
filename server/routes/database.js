@@ -5,8 +5,50 @@
 
 const express = require('express');
 const dbManager = require('../config/db-manager');
+const { loadAuthConfig } = require('../auth');
 
 const router = express.Router();
+
+/**
+ * 管理员鉴权：只有携带服务器 API Key（X-API-Key 请求头）才能操作。
+ * 普通访客拿到的 JWT 客户端 Token 不能通过这里，留言审核/删除必须是你本人。
+ */
+function requireServerApiKey(req, res, next) {
+  const config = loadAuthConfig();
+  const apiKeyHeader = req.headers['x-api-key'];
+  if (!config.serverApiKey) {
+    return res.status(500).json({ success: false, error: '服务器未配置管理员 API Key' });
+  }
+  if (!apiKeyHeader || apiKeyHeader !== config.serverApiKey) {
+    return res.status(403).json({ success: false, error: '需要管理员 API Key', code: 'ADMIN_REQUIRED' });
+  }
+  next();
+}
+
+/**
+ * 把平铺的留言拼成两层楼中楼：顶级留言带 replies 数组。
+ * 回复只挂一层（回复的回复也挂到顶级留言下，@用户名保留指向），避免无限嵌套把墙面拉得太深。
+ */
+function buildGuestTree(rows) {
+  const byId = new Map();
+  const roots = [];
+  rows.forEach(r => {
+    r.replies = [];
+    byId.set(r.id, r);
+  });
+  rows.forEach(r => {
+    if (r.parent_id && byId.has(r.parent_id)) {
+      // 回复的回复也挂到顶级留言下
+      let top = byId.get(r.parent_id);
+      while (top.parent_id && byId.has(top.parent_id)) top = byId.get(top.parent_id);
+      top.replies.push(r);
+    } else if (!r.parent_id) {
+      roots.push(r);
+    }
+    // parent_id 指向不存在/未通过的留言时丢弃，避免孤儿回复出现在墙上
+  });
+  return roots;
+}
 
 // ============================================
 // 健康检查
@@ -270,7 +312,8 @@ router.get('/blockchain-records/:id/verify', async (req, res) => {
 // 留言 API
 // ============================================
 
-// 获取留言列表（分页）
+// 获取留言列表（分页，楼中楼：顶级留言带 replies 数组）
+// 只返回已审核通过的（is_public=1 AND is_verified=1）；回复跟随顶级留言一起返回，不单独分页
 router.get('/guest-messages', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -285,21 +328,39 @@ router.get('/guest-messages', async (req, res) => {
       });
     }
 
-    const sql = `
-      SELECT id, user_name, content, location, created_at
+    // 先取本页顶级留言的 id（只数顶级留言，回复不占分页名额）
+    const topSql = `
+      SELECT id
       FROM guest_messages
-      WHERE is_public = 1 AND is_verified = 1
+      WHERE is_public = 1 AND is_verified = 1 AND parent_id IS NULL
       ORDER BY created_at DESC
       LIMIT ${parseInt(limit, 10)} OFFSET ${parseInt(offset, 10)}
     `;
+    const topRows = await dbManager.query(topSql);
+    const topIds = topRows.map(r => r.id);
 
-    const messages = await dbManager.query(sql);
+    // 再取这些顶级留言及其已通过的回复
+    let messages = [];
+    if (topIds.length > 0) {
+      const sql = `
+        SELECT id, parent_id, user_name, content, location, created_at
+        FROM guest_messages
+        WHERE is_public = 1 AND is_verified = 1
+          AND (parent_id IS NULL AND id IN (${topIds.join(',')})
+               OR parent_id IN (${topIds.join(',')}))
+        ORDER BY created_at ASC
+      `;
+      const rows = await dbManager.query(sql);
+      messages = buildGuestTree(rows);
+      // 顶级留言按时间倒序（回复在各自楼内按时间正序）
+      messages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
 
-    // 获取总数
+    // 获取顶级留言总数（用于分页）
     const countSql = `
       SELECT COUNT(*) as total
       FROM guest_messages
-      WHERE is_public = 1 AND is_verified = 1
+      WHERE is_public = 1 AND is_verified = 1 AND parent_id IS NULL
     `;
     const countResult = await dbManager.query(countSql);
     const total = countResult[0].total;
@@ -323,35 +384,104 @@ router.get('/guest-messages', async (req, res) => {
   }
 });
 
-// 提交留言
+// 提交留言（顶级留言或回复；回复时传 parent_id，指向要回复的留言 id）
+// 新留言（含回复）一律先待审核（is_public=0, is_verified=0），管理员通过后才显示
 router.post('/guest-messages', async (req, res) => {
   try {
-    const { user_name, content, location } = req.body;
-    
+    const { user_name, content, location, parent_id } = req.body;
+
     if (!user_name || !content) {
       return res.status(400).json({
         success: false,
         error: '姓名和内容为必填项'
       });
     }
-    
+
+    // 回复时校验目标留言存在（顶级或回复都可回，回复的回复挂到同一顶级楼下）
+    let parentId = null;
+    if (parent_id !== undefined && parent_id !== null && parent_id !== '') {
+      parentId = parseInt(parent_id, 10);
+      if (isNaN(parentId)) {
+        return res.status(400).json({ success: false, error: 'parent_id 必须是数字' });
+      }
+      const parent = await dbManager.query('SELECT id FROM guest_messages WHERE id = ?', [parentId]);
+      if (!parent || parent.length === 0) {
+        return res.status(400).json({ success: false, error: '要回复的留言不存在' });
+      }
+    }
+
     const sql = `
-      INSERT INTO guest_messages (user_name, content, location, is_public, is_verified)
-      VALUES (?, ?, ?, 0, 0)
+      INSERT INTO guest_messages (parent_id, user_name, content, location, is_public, is_verified)
+      VALUES (?, ?, ?, ?, 0, 0)
     `;
-    
-    const result = await dbManager.query(sql, [user_name, content, location || '']);
-    
+
+    const result = await dbManager.query(sql, [parentId, user_name, content, location || '']);
+
     res.json({
       success: true,
       message: '留言已提交，待审核后显示',
-      id: result.insertId
+      id: result.insertId,
+      parent_id: parentId
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       error: error.message
     });
+  }
+});
+
+// ============================================
+// 留言审核（管理员，需服务器 API Key）
+// ============================================
+
+// 列出待审核留言（顶级+回复，按时间倒序）
+router.get('/guest-messages/pending', requireServerApiKey, async (req, res) => {
+  try {
+    const rows = await dbManager.query(`
+      SELECT id, parent_id, user_name, content, location, created_at
+      FROM guest_messages
+      WHERE is_public = 0 OR is_verified = 0
+      ORDER BY created_at DESC
+      LIMIT 100
+    `);
+    res.json({ success: true, data: rows, total: rows.length });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 通过一条留言（顶级或回复）：设为公开+已验证
+router.post('/guest-messages/:id/approve', requireServerApiKey, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ success: false, error: 'id 必须是数字' });
+    const result = await dbManager.query(
+      'UPDATE guest_messages SET is_public = 1, is_verified = 1 WHERE id = ?',
+      [id]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: '留言不存在' });
+    }
+    res.json({ success: true, message: '已通过审核', id });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 驳回一条留言：直接删除（含它的回复一并删除，避免孤儿回复）
+router.delete('/guest-messages/:id', requireServerApiKey, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ success: false, error: 'id 必须是数字' });
+    await dbManager.query('DELETE FROM guest_messages WHERE parent_id = ?', [id]);
+    const result = await dbManager.query('DELETE FROM guest_messages WHERE id = ?', [id]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, error: '留言不存在' });
+    }
+    res.json({ success: true, message: '已删除', id });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
