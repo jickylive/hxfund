@@ -35,6 +35,10 @@ const readline = require('readline');
 const CONFIG_DIR = path.join(process.env.HOME || process.env.USERPROFILE, '.qwen-code');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
+// API 请求超时（毫秒）：可用环境变量 QWEN_TIMEOUT_MS 覆盖，默认 120 秒
+// （推理型模型思考时间不可控，非流式请求需等完整响应，30 秒不够）
+const API_TIMEOUT_MS = parseInt(process.env.QWEN_TIMEOUT_MS, 10) || 120000;
+
 const DEFAULT_CONFIG = {
   apiKey: process.env.SCNET_API_KEY || process.env.GITCODE_API_KEY || process.env.QWEN_API_KEY || process.env.DASHSCOPE_API_KEY || '',
   baseURL: process.env.SCNET_BASE_URL || process.env.GITCODE_BASE_URL || process.env.QWEN_BASE_URL || process.env.DASHSCOPE_BASE_URL || 'https://coding.dashscope.aliyuncs.com/v1',
@@ -509,10 +513,10 @@ function callQwenAPI(config, prompt, conversationHistory = []) {
 
     req.on('timeout', () => {
       req.destroy();
-      reject(new Error('请求超时 (30 秒)'));
+      reject(new Error(`请求超时 (${Math.round(API_TIMEOUT_MS / 1000)} 秒)`));
     });
 
-    req.setTimeout(30000);
+    req.setTimeout(API_TIMEOUT_MS);
     req.write(data);
     req.end();
   });

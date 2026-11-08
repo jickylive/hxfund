@@ -13,6 +13,14 @@ const CLI_PATH = path.join(__dirname, '..', 'scripts', 'qwen-code.js');
 const CONFIG_FILE = path.join(process.env.HOME || process.env.USERPROFILE, '.qwen-code', 'config.json');
 
 /**
+ * CLI 进程超时（毫秒）= AI 请求超时（QWEN_TIMEOUT_MS，默认 120 秒）+ 30 秒进程启动余量。
+ * 在调用时读取，确保 dotenv 加载 .env 后生效。
+ */
+function getCliTimeoutMs() {
+  return (parseInt(process.env.QWEN_TIMEOUT_MS, 10) || 120000) + 30000;
+}
+
+/**
  * 加载 CLI 配置
  */
 function loadCliConfig() {
@@ -103,7 +111,7 @@ async function callQwenCli(prompt, options = {}) {
   return new Promise((resolve, reject) => {
     const process = spawn('node', args, {
       encoding: 'utf-8',
-      timeout: 60000, // 60 秒超时
+      timeout: getCliTimeoutMs(), // AI 请求超时 + 启动余量（QWEN_TIMEOUT_MS 可调）
       cwd: path.join(__dirname, '..'), // 在项目根目录执行
       env: env // 使用包含API密钥的环境变量
     });
@@ -162,7 +170,7 @@ async function callQwenCli(prompt, options = {}) {
 
     process.on('timeout', () => {
       process.kill();
-      reject(new Error('CLI 执行超时 (60 秒)'));
+      reject(new Error(`CLI 执行超时 (${Math.round(getCliTimeoutMs() / 1000)} 秒)`));
     });
   });
 }
@@ -215,7 +223,7 @@ function callQwenCliSync(prompt, options = {}) {
   try {
     const result = spawnSync('node', args, {
       encoding: 'utf-8',
-      timeout: 60000,
+      timeout: getCliTimeoutMs(),
       maxBuffer: 10 * 1024 * 1024,
       env: env,
       cwd: path.join(__dirname, '..')
