@@ -1,0 +1,94 @@
+# 同步到上游仓库 jickyoffice/hxfund（触发 ACR 自动构建镜像）
+#
+# 背景：
+#   个人 ACR 关联的是 GitHub jickyoffice 账号，构建规则监听的是
+#   jickyoffice/hxfund 仓库（main 分支）。因此代码合到 jickylive/hxfund 后，
+#   须同步到 jickyoffice/hxfund，才能触发 ACR 自动构建镜像。
+#
+# 流程：
+#   1. jickylive/hxfund 的 main 有 push（PR 合并后）且改动了后端代码时触发。
+#   2. 本 workflow 用 PAT 创建一个跨仓库 PR（jickylive:main → jickyoffice:main）。
+#   3. PR 创建后尝试自动合并（gh pr merge --auto）；合并不了时（如冲突）PR 留着，
+#      由人工处理——首次同步若因 2026-11-08 的 git 历史改写而冲突，
+#      可将 jickyoffice/hxfund:main 强制重置为与 jickylive/hxfund:main 一致（一次即可），
+#      此后同步 PR 均可干净合并。
+#   4. PR 合并到 jickyoffice/hxfund:main 后，ACR 构建规则自动构建镜像并推送到
+#      registry.cn-shenzhen.aliyuncs.com/jicky/hxfund-api:latest。
+#   5. lh 上的定时任务（scripts/pull-and-update.sh，每 5 分钟）拉取并更新。
+#
+# 需要的 GitHub Secret（在 jickylive/hxfund 仓库设置）：
+#   UPSTREAM_SYNC_TOKEN  个人访问令牌（PAT），须同时有以下权限：
+#     - jickylive/hxfund：读（创建 PR 需要读源仓库）
+#     - jickyoffice/hxfund：写（创建 PR 与合并需要写目标仓库）
+#   建议用 fine-grained PAT，只勾这两个仓库的 Contents 与 Pull requests 读写权限。
+#   注意：默认的 GITHUB_TOKEN 只能访问当前仓库，跨仓库 PR 必须用 PAT。
+#
+# ACR 侧需确认（阿里云 ACR 控制台，构建规则）：
+#   - 源仓库：jickyoffice/hxfund，分支：main。
+#   - Dockerfile 路径：仓库根目录 Dockerfile。
+#   - 镜像标签：jicky/hxfund-api:latest（须与 lh 拉取脚本一致）。
+#   - 构建规则须启用“代码变更后自动构建”。
+#
+# 注意：jickyoffice/hxfund 只作为 ACR 构建的镜像源，不要直接在上面提交代码，
+#   所有改动都走 jickylive/hxfund 的 PR，由本 workflow 同步。
+
+name: 同步到上游 jickyoffice/hxfund（触发 ACR 构建）
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'server/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Dockerfile'
+  workflow_dispatch:  # 手动触发
+
+jobs:
+  sync:
+    name: 创建同步 PR 并自动合并
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 创建同步 PR 到上游
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_SYNC_TOKEN }}
+        run: |
+          set -e
+          UPSTREAM="jickyoffice/hxfund"
+          HEAD="jickylive:main"
+          TITLE="同步 jickylive/hxfund main（自动，触发 ACR 构建）"
+          BODY="自动同步：jickylive/hxfund 的 main 有新合并，同步到上游以触发 ACR 自动构建镜像。合并后 lh 定时任务会自动拉取更新。"
+
+          # 已有未合并的同步 PR 时不再新建（避免重复）
+          EXISTING=$(gh pr list --repo "$UPSTREAM" --head "$HEAD" --base main --state open --json number --jq '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            echo "已有未合并的同步 PR #${EXISTING}，跳过新建。"
+            echo "pr_number=${EXISTING}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 没有可同步的改动时 gh pr create 会失败，属正常（上游已是最新）
+          PR_URL=$(gh pr create --repo "$UPSTREAM" --head "$HEAD" --base main --title "$TITLE" --body "$BODY" 2>&1) || {
+            echo "创建 PR 失败（可能上游已是最新，或两仓库历史已分叉）："
+            echo "$PR_URL"
+            echo "若因历史分叉导致冲突，请将 jickyoffice/hxfund:main 强制重置为与 jickylive/hxfund:main 一致（一次即可）。"
+            exit 0
+          }
+          echo "已创建同步 PR：$PR_URL"
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+
+          # 尝试自动合并（合并不了时 PR 留着人工处理，不报错）
+          if gh pr merge --auto --squash "$PR_NUMBER" --repo "$UPSTREAM" 2>&1; then
+            echo "已启用自动合并，PR #${PR_NUMBER} 将在可合并时自动合入。"
+          else
+            echo "警告：自动合并启用失败，PR #${PR_NUMBER} 需人工合并。"
+          fi
