@@ -42,7 +42,7 @@ class QwenAI {
     const saved = this.storageManager.get('qwenConfig');
     if (saved) {
       const config = JSON.parse(saved);
-      this.qwenModelSelect.value = config.model || 'qwen3.5-plus';
+      this.qwenModelSelect.value = config.model || 'deepseek-ai/DeepSeek-V4-Flash';
       this.qwenTemperature.value = config.temperature || '0.7';
       this.tempValue.textContent = config.temperature || '0.7';
     }

@@ -93,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 保存配置
     function saveConfig() {
         const config = {
-            model: qwenModelSelect ? qwenModelSelect.value : 'qwen3.5-plus',
+            model: qwenModelSelect ? qwenModelSelect.value : 'deepseek-ai/DeepSeek-V4-Flash',
             temperature: qwenTemperature ? qwenTemperature.value : '0.7',
             token: authToken,
             tokenExpiresAt: tokenExpiresAt
@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
         qwenMessages.scrollTop = qwenMessages.scrollHeight;
 
         try {
-            const model = qwenModelSelect ? qwenModelSelect.value : 'qwen3.5-plus';
+            const model = qwenModelSelect ? qwenModelSelect.value : 'deepseek-ai/DeepSeek-V4-Flash';
             const temperature = qwenTemperature ? qwenTemperature.value : '0.7';
 
             const data = await callConversationAPI(currentMessage, model, temperature);
