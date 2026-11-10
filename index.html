@@ -53,6 +53,18 @@
 
 <body>
     <!-- ============================================
+         Muse 邀请横幅（可关闭，关闭后记住选择）
+    ============================================= -->
+    <div class="muse-banner" id="museBanner" role="note">
+        <span class="muse-banner-text">🎁 试试我的个人 AI 助手 Muse：注册后 48 小时内在「设置」里兑现邀请码 <strong>GEBSV5</strong>，我们各得 10 亿词元</span>
+        <a class="muse-banner-link" href="https://muse.ai/join" target="_blank" rel="noopener">立即加入 →</a>
+        <button class="muse-banner-close" type="button" aria-label="关闭横幅" onclick="try{localStorage.setItem('muse-banner-closed','1')}catch(e){}document.getElementById('museBanner').remove()">×</button>
+    </div>
+    <script>
+        try { if (localStorage.getItem('muse-banner-closed') === '1') { document.getElementById('museBanner').remove(); } } catch (e) {}
+    </script>
+
+    <!-- ============================================
          页面加载动画
     ============================================= -->
     <div id="pageLoader" class="page-loader">

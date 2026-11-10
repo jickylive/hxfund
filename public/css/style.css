@@ -2729,3 +2729,61 @@ textarea#guestInput:focus {
 .reply-indicator button:hover {
     color: var(--primary);
 }
+
+/* --- Muse 邀请横幅 --- */
+.muse-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 48px 10px 16px;
+    background: var(--bg-dark);
+    color: var(--text-white);
+    font-size: 0.95rem;
+    line-height: 1.5;
+    text-align: center;
+    position: relative;
+}
+.muse-banner strong {
+    color: var(--gold-light);
+    letter-spacing: 1px;
+}
+.muse-banner-link {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 999px;
+    background: var(--gold);
+    color: #2d1a0e;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: var(--transition);
+}
+.muse-banner-link:hover {
+    background: var(--gold-light);
+}
+.muse-banner-close {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-white);
+    opacity: 0.7;
+    font-size: 1.3rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+.muse-banner-close:hover {
+    opacity: 1;
+}
+@media (max-width: 640px) {
+    .muse-banner {
+        font-size: 0.85rem;
+        padding: 8px 40px 8px 12px;
+        gap: 8px;
+    }
+}
