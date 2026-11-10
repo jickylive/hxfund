@@ -148,9 +148,9 @@ jobs:
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
           port: ${{ secrets.FTP_PORT || 21 }}
-          # 必须显式 FTPS：不写 protocol 默认明文 FTP（21 端口），
-          # 旧版 workflow 写过 ftps，后来回归丢了，密码明文传输
-          protocol: ftps
+          # 注意：虚拟主机只支持明文 FTP，不支持 FTPS（实测 AUTH TLS 直接报 530）。
+          # 之前写 ftps 会导致部署 1 秒失败；密码明文传输是该主机的限制，无加密选项。
+          protocol: ftp
           local-dir: ./dist/
           server-dir: /htdocs/
           exclude: |
@@ -193,8 +193,8 @@ jobs:
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASS }}
           port: ${{ secrets.FTP_PORT || 21 }}
-          # 必须显式 FTPS：不写 protocol 默认明文 FTP（21 端口），见上
-          protocol: ftps
+          # 同上：主机只支持明文 FTP，见上
+          protocol: ftp
           local-dir: blog/public/
           server-dir: /htdocs/blog/
           exclude: |
