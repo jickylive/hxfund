@@ -17,7 +17,7 @@
 
 **修复前**:
 ```
-FTP_PASSWORD=Qq803200
+FTP_PASSWORD=<已删除的明文密码>
 ECS_SSH_KEY=your_ssh_private_key
 ECS_HOST=120.25.77.136
 ```
@@ -84,7 +84,7 @@ _config.deploy.yml
 |-------------|-------|------|
 | `FTP_HOST` | `qxu1606470020.my3w.com` | 虚拟主机 FTP 地址 |
 | `FTP_USER` | `qxu1606470020` | FTP 用户名 |
-| `FTP_PASS` | `Qq803200` | FTP 密码 |
+| `FTP_PASS` | （见 GitHub Secrets，不写明文） | FTP 密码 |
 | `FTP_PORT` | `21` | FTP 端口 |
 
 ### 后端部署 (ECS)
