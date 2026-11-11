@@ -8,13 +8,17 @@ echo "==========================================="
 echo
 echo "🔍 检查 Git 历史中的敏感信息..."
 
-# 检查是否还存在明文密码
+# 检查是否还存在明文密码（密码不硬编码，通过环境变量 FTP_PASSWORD 传入；未设置则跳过此项）
 PASSWORD_FOUND=false
-if git log --all -S "Qq803200" --quiet; then
-    echo "⚠️  警告：在 Git 历史中发现敏感密码！"
-    PASSWORD_FOUND=true
+if [ -n "$FTP_PASSWORD" ]; then
+    if git log --all -S "$FTP_PASSWORD" --quiet; then
+        echo "⚠️  警告：在 Git 历史中发现敏感密码！"
+        PASSWORD_FOUND=true
+    else
+        echo "✅ 未在 Git历史中发现已知的明文密码"
+    fi
 else
-    echo "✅ 未在 Git 历史中发现已知的明文密码"
+    echo "ℹ️  未设置 FTP_PASSWORD 环境变量，跳过历史密码检查"
 fi
 
 echo
@@ -26,7 +30,7 @@ echo "   - server/config/.env: $(if grep -q 'server/config/\.env' .gitignore; th
 echo
 echo "🚨 安全建议："
 echo "1. 立即轮换以下已泄露的凭证："
-echo "   - FTP 密码 (如果仍在使用 Qq803200)"
+echo "   - FTP 密码 (如果仍在使用泄露的密码)"
 echo "   - API 密钥 (如果仍在使用开发密钥)"
 echo "   - JWT Secret (如果仍在使用默认密钥)"
 
