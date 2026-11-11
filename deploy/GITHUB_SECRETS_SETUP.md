@@ -7,7 +7,7 @@
 |------|------|
 | FTP 主机 | `qxu1606470020.my3w.com` |
 | FTP 用户名 | `qxu1606470020` |
-| FTP 密码 | `Qq803200` |
+| FTP 密码 | （见 GitHub Secrets `FTP_PASS`，不写明文） |
 | FTP 端口 | `21` (默认) |
 | 部署目录 | `/htdocs/` (主站) |
 | 博客目录 | `/htdocs/blog/` (子目录) |
@@ -25,7 +25,7 @@
    |-------------|-------|
    | `FTP_HOST` | `qxu1606470020.my3w.com` |
    | `FTP_USER` | `qxu1606470020` |
-   | `FTP_PASS` | `Qq803200` |
+   | `FTP_PASS` | （见 GitHub Secrets，不写明文） |
    | `FTP_PORT` | `21` |
    | `FRONTEND_DOMAIN` | `www.hxfund.cn` |
 
@@ -94,10 +94,10 @@ sudo apt-get install lftp  # Ubuntu/Debian
 sudo yum install lftp      # CentOS/Alibaba Cloud Linux
 
 # 连接测试
-lftp -u qxu1606470020,Qq803200 qxu1606470020.my3w.com
+lftp -u qxu1606470020,<FTP密码> qxu1606470020.my3w.com
 
 # 连接后执行命令
-lftp -e "ls; quit" -u qxu1606470020,Qq803200 qxu1606470020.my3w.com
+lftp -e "ls; quit" -u qxu1606470020,<FTP密码> qxu1606470020.my3w.com
 ```
 
 ### 使用部署脚本
